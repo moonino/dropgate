@@ -71,8 +71,9 @@ deploy/helm/*/charts/
 
 # agent and local tool state
 .omc/
-.claude/settings.local.json
+.claude/
 CLAUDE.local.md
+*.bak-*
 
 # personal workspace, never committed
 work/
