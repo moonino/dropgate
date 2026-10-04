@@ -1,0 +1,15 @@
+.DS_Store
+.gradle/
+build/
+out/
+*.iml
+.idea/
+.kotlin/
+node_modules/
+.env
+*.pem
+terraform.tfstate*
+.terraform/
+
+# personal workspace, never committed
+work/
