@@ -32,7 +32,7 @@ dropgate 저장소 규칙이다. 혼자 하는 프로젝트지만 팀 레포처�
 - PR마다 Claude Code(Opus 5.5)가 자동 리뷰를 단다(`.github/workflows/claude-code-review.yml`). 지적은 실측이나 설계 문서로 검증한 뒤 반영하거나 기각하고, 기각 이유를 답글로 남긴다. 오탐을 그대로 반영하지 않는다. 이슈나 PR 댓글에 `@claude`를 적으면 작업을 시킬 수 있다(`claude.yml`).
 - 리뷰 워크플로는 저장소 시크릿 `CLAUDE_CODE_OAUTH_TOKEN`(Claude Max 계정, `claude setup-token`으로 발급)과 Claude GitHub 앱 설치가 필요하다.
 - 설계(`docs/design/`)와 다르게 구현한 PR은 설계 문서 변경과 ADR을 같은 PR에 넣는다.
-- 컨트롤러나 DTO를 바꾼 PR은 `docs/design/openapi.yaml`도 같이 고친다. 계약 테스트가 둘을 비교한다.
+- 컨트롤러나 DTO를 바꾼 PR은 `docs/design/openapi.yaml`도 같이 고친다. 계약 테스트가 둘을 비교한다. openapi.yaml을 고쳤으면 `npx @redocly/cli lint docs/design/openapi.yaml`이 통과해야 한다.
 
 ## 5. 코드 규칙
 

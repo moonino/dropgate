@@ -32,7 +32,8 @@
 - 페이징은 전부 커서. `nextCursor`가 null이면 끝. OFFSET은 쓰지 않는다
 - 오류 응답은 `{code, message, errors[]}` 하나. message는 사용자에게 그대로 보여 줄 한국어 문장이고 클라이언트는 code로 분기한다(미터엔진 MS2-332 결정과 같다)
 - 503에는 Retry-After 초를 붙인다
-- Bearer 검증은 common 모듈 필터 하나. JWKS 10분 캐시, 무효화 목록은 요청마다 Redis 확인
+- Bearer 검증은 common 모듈 필터 하나. JWKS 10분 캐시, 무효화 목록은 요청마다 Redis 확인. 그래서 Bearer 엔드포인트는 전부 503 AUTH_UNAVAILABLE을 낼 수 있다
+- openapi.yaml은 `npx @redocly/cli lint docs/design/openapi.yaml`이 통과해야 한다. 규칙은 루트 `redocly.yaml`
 
 ## 오류 코드표
 
@@ -52,7 +53,8 @@
 | 409 | DROP_CLOSED | 취소 | 마감 뒤 취소 불가 |
 | 409 | JOB_ALREADY_RUNNING | 배치 | |
 | 502 | KAKAO_UNAVAILABLE | 로그인 | 카카오 응답 실패나 3초 초과 |
-| 503 | STOCK_UNAVAILABLE | 대기열, 구매, 재발급, 로그아웃, 토큰 검증 | Redis 명령 실패나 200ms 초과. Retry-After 2 |
+| 503 | AUTH_UNAVAILABLE | 재발급, 로그아웃, 모든 Bearer 엔드포인트의 토큰 검증 | 무효화 목록이나 리프레시 Redis 명령 실패나 200ms 초과. Retry-After 2 |
+| 503 | STOCK_UNAVAILABLE | 대기열, 구매 | 재고와 대기열 Redis 명령 실패나 200ms 초과. Retry-After 2 |
 | 503 | ORDER_PERSIST_FAILED | 구매 | Lua 성공 뒤 DB 실패, Redis 보상 완료. Retry-After 2 |
 | 503 | NOTIFICATION_UNAVAILABLE | 피드 | DynamoDB 실패 |
 
