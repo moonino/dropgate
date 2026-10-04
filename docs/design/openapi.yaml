@@ -6,12 +6,12 @@ info:
 servers:
   - url: https://dropgate.example.com
 tags:
-  - name: auth
-  - name: drops
-  - name: queue
-  - name: orders
-  - name: notifications
-  - name: batch
+  - { name: auth, description: "카카오 로그인, 토큰, JWKS" }
+  - { name: drops, description: 드롭 등록과 조회 }
+  - { name: queue, description: 접속 대기열과 입장 }
+  - { name: orders, description: "구매, 취소, 내 주문" }
+  - { name: notifications, description: 알림 피드 }
+  - { name: batch, description: 결산과 대조 잡. 클러스터 안에서만 호출 }
 components:
   securitySchemes:
     bearer:
@@ -73,7 +73,7 @@ components:
         admissionRatePerSec: { type: integer, minimum: 1, maximum: 10000, default: 50 }
     Drop:
       type: object
-      required: [id, name, totalQuantity, openAt, closeAt, status]
+      required: [id, name, totalQuantity, openAt, closeAt, status, admissionRatePerSec]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
@@ -81,6 +81,7 @@ components:
         openAt: { type: string, format: date-time }
         closeAt: { type: string, format: date-time }
         status: { type: string, enum: [SCHEDULED, OPEN, SOLD_OUT, CLOSED] }
+        admissionRatePerSec: { type: integer }
         remainingQuantity:
           type: [integer, "null"]
           description: Redis 재고. Redis를 읽을 수 없으면 null
@@ -95,7 +96,7 @@ components:
       required: [state, position, estimatedWaitSec]
       properties:
         state: { type: string, enum: [WAITING] }
-        position: { type: integer, description: 0부터, 내 앞 사람 수 }
+        position: { type: integer, description: "0부터, 내 앞 사람 수" }
         estimatedWaitSec: { type: integer }
     QueueStatus:
       type: object
@@ -155,7 +156,7 @@ components:
         jobName: { type: string }
         status: { type: string, enum: [STARTING, STARTED, COMPLETED, FAILED, STOPPED] }
         exitCode: { type: [string, "null"] }
-        startTime: { type: string, format: date-time }
+        startTime: { type: [string, "null"], format: date-time, description: STARTING이면 null }
         endTime: { type: [string, "null"], format: date-time }
         steps:
           type: array
@@ -180,11 +181,8 @@ components:
     NotFound:
       description: code DROP_NOT_FOUND 또는 ORDER_NOT_FOUND
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
-    Conflict:
-      description: 상태 충돌. code는 엔드포인트 설명 참고
-      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     Unavailable:
-      description: 의존 저장소 불가. code STOCK_UNAVAILABLE 등. Retry-After 헤더
+      description: "의존 저장소 불가. Retry-After 2. code는 AUTH_UNAVAILABLE(모든 Bearer 엔드포인트의 토큰 무효화 확인, 재발급, 로그아웃), STOCK_UNAVAILABLE(대기열, 구매), ORDER_PERSIST_FAILED(구매), NOTIFICATION_UNAVAILABLE(피드)"
       headers:
         Retry-After: { schema: { type: integer }, description: 초 }
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
@@ -193,12 +191,14 @@ paths:
     get:
       tags: [auth]
       summary: 카카오 인가 페이지로 리다이렉트
+      security: []
       responses:
         '302': { description: Location 카카오 인가 URL }
   /auth/callback/kakao:
     get:
       tags: [auth]
       summary: 카카오 콜백. 사용자 저장 뒤 토큰 발급
+      security: []
       parameters:
         - { name: code, in: query, required: true, schema: { type: string } }
         - { name: state, in: query, required: true, schema: { type: string } }
@@ -210,6 +210,7 @@ paths:
     post:
       tags: [auth]
       summary: 리프레시 토큰으로 새 토큰 쌍 발급. 옛 리프레시는 폐기(회전)
+      security: []
       requestBody:
         required: true
         content:
@@ -239,10 +240,12 @@ paths:
       responses:
         '200': { description: 사용자, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /.well-known/jwks.json:
     get:
       tags: [auth]
       summary: 공개키 집합. 다른 서비스가 10분 캐시
+      security: []
       responses:
         '200': { description: JWKS, content: { application/json: { schema: { $ref: '#/components/schemas/Jwks' } } } }
   /api/admin/drops:
@@ -258,10 +261,12 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /api/drops:
     get:
       tags: [drops]
       summary: 드롭 목록(SCHEDULED, OPEN, SOLD_OUT), openAt 순, 커서 페이징
+      security: []
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
@@ -271,6 +276,7 @@ paths:
     get:
       tags: [drops]
       summary: 드롭 단건. remainingQuantity는 Redis에서, 못 읽으면 null
+      security: []
       parameters:
         - { name: dropId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -287,12 +293,12 @@ paths:
         '202': { description: 대기 중, content: { application/json: { schema: { $ref: '#/components/schemas/QueueEnterResponse' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: "code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '503': { $ref: '#/components/responses/Unavailable' }
   /api/drops/{dropId}/queue/me:
     get:
       tags: [queue]
-      summary: 내 순번과 입장 상태. 클라이언트는 2초 간격 폴링
+      summary: 내 순번과 입장 상태. 클라이언트는 2초 간격 폴링, 409를 받으면 폴링을 끝낸다
       security: [ { bearer: [] } ]
       parameters:
         - { name: dropId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -300,6 +306,7 @@ paths:
         '200': { description: 상태, content: { application/json: { schema: { $ref: '#/components/schemas/QueueStatus' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: "드롭이 OPEN이 아니다. code DROP_NOT_OPEN, SOLD_OUT", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '503': { $ref: '#/components/responses/Unavailable' }
     delete:
       tags: [queue]
@@ -308,8 +315,9 @@ paths:
       parameters:
         - { name: dropId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '204': { description: 완료(없어도 204) }
+        '204': { description: 완료(대기열에 없어도 204) }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /api/drops/{dropId}/orders:
     post:
@@ -323,8 +331,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: code NOT_ADMITTED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
-        '503': { description: code STOCK_UNAVAILABLE 또는 ORDER_PERSIST_FAILED. Retry-After 2, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: "code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED. Lua 반환 순서", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /api/orders/me:
     get:
       tags: [orders]
@@ -336,6 +344,7 @@ paths:
       responses:
         '200': { description: 목록, content: { application/json: { schema: { $ref: '#/components/schemas/OrderPage' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /api/orders/{orderId}/cancel:
     post:
       tags: [orders]
@@ -348,7 +357,8 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: code ORDER_ALREADY_CANCELED, DROP_CLOSED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: "code ORDER_ALREADY_CANCELED, DROP_CLOSED", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /api/notifications/me:
     get:
       tags: [notifications]
@@ -365,23 +375,27 @@ paths:
     post:
       tags: [batch]
       summary: 일별 결산 실행. 클러스터 안에서만 호출. 같은 날짜 재호출은 재시작
+      security: []
       parameters:
-        - { name: settlementDate, in: query, required: false, schema: { type: string, format: date }, description: KST 날짜, 기본 어제 }
+        - { name: settlementDate, in: query, required: false, schema: { type: string, format: date }, description: "KST 날짜, 기본 어제" }
       responses:
         '202': { description: 시작됨, content: { application/json: { schema: { $ref: '#/components/schemas/JobAccepted' } } } }
         '409': { description: 같은 파라미터로 실행 중. code JOB_ALREADY_RUNNING, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
   /batch/jobs/reconciliation:
     post:
       tags: [batch]
-      summary: Redis 대 DB 대조 실행
+      summary: Redis 대 DB 대조 실행. dropId가 없으면 OPEN과 SOLD_OUT 드롭 전부
+      security: []
       parameters:
         - { name: dropId, in: query, required: false, schema: { type: string, format: uuid } }
       responses:
         '202': { description: 시작됨, content: { application/json: { schema: { $ref: '#/components/schemas/JobAccepted' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
   /batch/jobs/{executionId}:
     get:
       tags: [batch]
       summary: 실행 상태
+      security: []
       parameters:
         - { name: executionId, in: path, required: true, schema: { type: integer } }
       responses:

@@ -109,7 +109,7 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 |---|---|---|---|
 | id | uuid | PK | |
 | name | varchar(100) | NOT NULL | |
-| total_quantity | int | NOT NULL, CHECK (total_quantity > 0) | 초기 재고. 등록 뒤 변경 불가(트리거) |
+| total_quantity | int | NOT NULL, CHECK (total_quantity > 0) | 초기 재고. OPEN 이후 변경 불가(트리거) |
 | remaining_quantity | int | NOT NULL, CHECK (remaining_quantity BETWEEN 0 AND total_quantity) | 1주 차 DB만 경로의 재고. 2주 차부터 재고의 정본은 Redis고 이 컬럼은 DB 경로 플래그가 켜졌을 때만 갱신한다. 대조 배치는 이 컬럼이 아니라 orders 건수를 본다 |
 | open_at | timestamptz | NOT NULL | |
 | close_at | timestamptz | NOT NULL, CHECK (close_at > open_at) | |
@@ -121,7 +121,7 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 
 허용 상태 전이: SCHEDULED -> OPEN, OPEN -> SOLD_OUT, OPEN -> CLOSED, SOLD_OUT -> CLOSED. 그 외는 트리거가 거절한다. total_quantity, open_at은 OPEN 이후 변경을 트리거가 거절한다.
 
-인덱스: `drops_status_open_at_idx (status, open_at)`. 목록 조회가 status IN ('SCHEDULED','OPEN') ORDER BY open_at이다.
+인덱스: `drops_status_open_at_idx (status, open_at)`. 목록 조회가 status IN ('SCHEDULED','OPEN','SOLD_OUT') ORDER BY open_at이다.
 
 ### orders (현재 상태)
 
@@ -196,11 +196,11 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 | drop_id | uuid | NOT NULL |
 | run_at | timestamptz | NOT NULL, DEFAULT now() |
 | initial_quantity | int | NOT NULL |
-| redis_remaining | int | NULL, Redis가 없으면 NULL |
+| redis_remaining | int | NULL, Redis를 못 읽으면 NULL |
 | db_confirmed | int | NOT NULL |
 | db_canceled | int | NOT NULL |
-| diff | int | NOT NULL, initial_quantity - redis_remaining - (db_confirmed - db_canceled) |
-| status | varchar(20) | NOT NULL, CHECK (status IN ('MATCH','MISMATCH','REDIS_UNAVAILABLE')) |
+| diff | int | NULL, initial_quantity - redis_remaining - (db_confirmed - db_canceled). Redis를 못 읽으면 NULL |
+| status | varchar(20) | NOT NULL, CHECK (status IN ('MATCH','MISMATCH','REDIS_UNAVAILABLE')), CHECK ((status = 'REDIS_UNAVAILABLE') = (diff IS NULL)), CHECK (status <> 'MATCH' OR diff = 0) |
 
 인덱스: `reconciliation_drop_run_idx (drop_id, run_at DESC)`.
 
