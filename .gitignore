@@ -13,3 +13,6 @@ terraform.tfstate*
 
 # personal workspace, never committed
 work/
+
+# local tool state
+.omc/
