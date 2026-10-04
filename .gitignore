@@ -1,18 +1,78 @@
+# macOS, IDE, editor
 .DS_Store
+._*
+.idea/
+*.iml
+.run/
+*.swp
+*~
+
+# Kotlin, Gradle, JVM
 .gradle/
+.kotlin/
 build/
 out/
-*.iml
-.idea/
-.kotlin/
+local.properties
+hs_err_pid*
+replay_pid*
+*.hprof
+*.log
+logs/
 node_modules/
+
+# secrets and local config
 .env
+.env.*
+!.env.example
 *.pem
+*.key
+*.p12
+*.jks
+*.pfx
+application-local.yml
+application-local.yaml
+application-*.local.yml
+application-*.local.yaml
+*.local.yaml
+*.local.yml
+docker-compose.override.yml
+compose.override.yml
+compose.override.yaml
+
+# local data stores
+dump.rdb
+appendonly.aof
+appendonlydir/
+shared-local-instance.db
+pgdata/
+
+# load test output (measurements go to docs/measurements as tables)
+k6/results/
+*.k6.json
+
+# Terraform, Kubernetes, Helm
 terraform.tfstate*
 .terraform/
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+kubeconfig
+kubeconfig*
+*.kubeconfig
+deploy/helm/*/charts/
+*.tgz
+
+# agent and local tool state
+.omc/
+.claude/settings.local.json
+CLAUDE.local.md
 
 # personal workspace, never committed
 work/
-
-# local tool state
-.omc/
