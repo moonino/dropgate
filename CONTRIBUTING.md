@@ -30,7 +30,7 @@ dropgate 저장소 규칙이다. 혼자 하는 프로젝트지만 팀 레포처�
 - 제목은 커밋 제목 형식. 본문은 `.github/pull_request_template.md`를 채운다.
 - CI 녹색이어야 머지한다. 사람 리뷰어가 없으므로 셀프 머지지만 본문의 체크리스트를 전부 확인한 뒤 머지한다.
 - PR마다 Claude Code(Opus 5.5)가 자동 리뷰를 단다(`.github/workflows/claude-code-review.yml`). 지적은 실측이나 설계 문서로 검증한 뒤 반영하거나 기각하고, 기각 이유를 답글로 남긴다. 오탐을 그대로 반영하지 않는다. 이슈나 PR 댓글에 `@claude`를 적으면 작업을 시킬 수 있다(`claude.yml`).
-- PR 본문의 AI 칸에 AI가 만든 범위와 검증 방법을 적는다. AI가 준 코드나 지적을 쓰지 않은 사례는 `docs/ai-log/`에 한 건씩 남기고, 주간 집계는 `docs/ai-log/weekly.md`에 적는다.
+- PR 본문의 AI 칸에 AI가 만든 범위와 검증 방법을 적는다. 자동 리뷰 지적마다 반영 또는 기각으로 시작하는 답글을 하나 남긴다. AI가 준 코드나 지적을 쓰지 않은 사례는 `docs/ai-log/`에 한 건씩 남기고, 주간 집계는 `docs/ai-log/weekly.md`에 적는다.
 - 리뷰 워크플로는 저장소 시크릿 `CLAUDE_CODE_OAUTH_TOKEN`(Claude Max 계정, `claude setup-token`으로 발급)과 Claude GitHub 앱 설치가 필요하다.
 - 설계(`docs/design/`)와 다르게 구현한 PR은 설계 문서 변경과 ADR을 같은 PR에 넣는다.
 - 컨트롤러나 DTO를 바꾼 PR은 `docs/design/openapi.yaml`도 같이 고친다. 계약 테스트가 둘을 비교한다. openapi.yaml을 고쳤으면 `npx @redocly/cli lint docs/design/openapi.yaml`이 통과해야 한다.
