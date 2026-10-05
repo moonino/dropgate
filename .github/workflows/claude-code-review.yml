@@ -28,5 +28,18 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
+          show_full_output: true
           prompt: "/code-review --comment ${{ github.event.pull_request.html_url }}"
-          claude_args: '--model claude-opus-5-5 --allowedTools "Skill,Agent,TodoWrite,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh search:*)"'
+          claude_args: '--model claude-opus-5-5 --allowedTools "Skill,Agent,TodoWrite,mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh search:*)"'
+
+      - name: Verify the review was posted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          latest=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq '[.[] | select(.user.login == "claude[bot]")] | last | .body // ""')
+          if ! grep -q '^## Code review' <<< "$latest"; then
+            echo "::error::The latest claude[bot] comment has no '## Code review' section. The review skill stopped without reporting."
+            exit 1
+          fi
