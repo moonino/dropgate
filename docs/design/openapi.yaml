@@ -182,7 +182,7 @@ components:
       description: code DROP_NOT_FOUND 또는 ORDER_NOT_FOUND
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     Unavailable:
-      description: "의존 저장소 불가. Retry-After 2. code는 AUTH_UNAVAILABLE(모든 Bearer 엔드포인트의 토큰 무효화 확인, 재발급, 로그아웃), STOCK_UNAVAILABLE(대기열, 구매), ORDER_PERSIST_FAILED(구매), NOTIFICATION_UNAVAILABLE(피드)"
+      description: "의존 저장소 불가. Retry-After 2. code는 AUTH_UNAVAILABLE(모든 Bearer 엔드포인트의 토큰 무효화 확인, 로그인 콜백, 재발급, 로그아웃), STOCK_UNAVAILABLE(대기열, 구매), ORDER_PERSIST_FAILED(구매), NOTIFICATION_UNAVAILABLE(피드)"
       headers:
         Retry-After: { schema: { type: integer }, description: 초 }
       content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
