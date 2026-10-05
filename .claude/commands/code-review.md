@@ -8,6 +8,7 @@ Provide a code review for the given pull request.
 **Agent assumptions (applies to all agents and subagents):**
 - All tools are functional and will work without error. Do not test tools or make exploratory calls. Make sure this is clear to every subagent that is launched.
 - Only call a tool if it is required to complete the task. Every tool call should have a clear purpose.
+- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh pr comment`, `gh issue view`, `gh search`. Read repository files with Read, Glob, and Grep. A command outside this list is denied, so do not attempt it.
 
 To do this, follow these steps precisely:
 
