@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: settlement-batch
+
+server:
+  port: 8084
