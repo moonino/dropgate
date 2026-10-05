@@ -13,7 +13,7 @@ TO=$3
 
 cd "$(git rev-parse --show-toplevel)"
 
-merged_prs=$(gh pr list --repo "$REPO" --state merged --search "merged:${FROM}..${TO}" --json number --jq '.[].number')
+merged_prs=$(gh pr list --repo "$REPO" --base main --state merged --limit 1000 --search "merged:${FROM}..${TO}" --json number --jq '.[].number')
 
 verdicts_of() {
   gh api --paginate "repos/${REPO}/pulls/$1/comments" \
@@ -50,7 +50,7 @@ shopt -s nullglob
 log_files=()
 if [ ${#pr_patterns[@]} -gt 0 ]; then
   for f in docs/ai-log/2*.md; do
-    if grep -qw "${pr_patterns[@]}" "$f"; then
+    if grep "대신 한 것" "$f" | grep -qw "${pr_patterns[@]}"; then
       log_files+=("$f")
     fi
   done
@@ -60,8 +60,9 @@ rejected_logs=${#log_files[@]}
 review_rejected_logs=0
 top_cause=없음
 if [ "$rejected_logs" -gt 0 ]; then
-  review_rejected_logs=$( (grep -l "자동 리뷰" "${log_files[@]}" || true) | wc -l | tr -d ' ')
-  top_cause=$(grep -h "왜 틀렸나" "${log_files[@]}" | cut -d'|' -f3 | cut -d'.' -f1 | sed 's/^ *//; s/ *$//' | sort | uniq -c | sort -rn | head -1 | sed 's/^ *[0-9]* //')
+  review_rejected_logs=$(grep -h "날짜, 도구" "${log_files[@]}" | grep -c "자동 리뷰" || true)
+  top_cause=$( (grep -h "왜 틀렸나" "${log_files[@]}" || true) | cut -d'|' -f3 | cut -d'.' -f1 | sed 's/^ *//; s/ *$//' | sort | uniq -c | sort -rn | head -1 | sed 's/^ *[0-9]* //')
+  top_cause=${top_cause:-없음}
 fi
 
 if [ "$rejected" -ne "$review_rejected_logs" ]; then
