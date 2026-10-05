@@ -29,7 +29,7 @@ Redis 측정 질문의 첫 줄은 "재고 100개에 1만 요청을 쏘면 성공
 ## 결과
 
 - `remaining_quantity`가 2주 차부터는 정본이 아닌 컬럼으로 남는다. 읽는 쪽이 헷갈리지 않게 ERD에 역할을 적어 두었고, 드롭 단건 조회의 remainingQuantity는 Redis에서 읽는다.
-- DB 경로 플래그가 켜진 동안 Redis stock은 줄지 않는다. 2주 차 이후에는 OPEN 전이 때 stock 키가 total_quantity로 초기화되므로(02 문서), 그 드롭의 단건 조회 remainingQuantity는 total_quantity에 머물고 대조 diff는 판매 수만큼 음수로 난다. 그래서 DB 경로 측정은 전용 드롭으로 하고, 측정이 끝나면 그 드롭을 CLOSED로 바꿔 대조 범위에서 빠지게 한다(06 문서). 1주 차에는 Redis가 없어 remainingQuantity는 API 명세대로 null이다.
+- DB 경로 플래그가 켜진 동안 Redis stock은 줄지 않는다. 2주 차 이후에는 OPEN 전이 때 stock 키가 total_quantity로 초기화되므로(02 문서), 그 드롭의 단건 조회 remainingQuantity는 total_quantity에 머물고 대조 diff는 판매 수만큼 음수로 난다. 그래서 DB 경로 측정은 전용 드롭으로 하고, 측정이 끝나면 그 드롭을 CLOSED로 바꿔 대조 범위에서 빠지게 한다(06 문서). 측정 중에 매시 대조가 돌아 diff 경보가 울리면 예상된 것으로 기록하고 무시한다. 1주 차에는 Redis가 없어 remainingQuantity는 API 명세대로 null이다.
 - 플래그 분기 하나가 구매 흐름에 생긴다. 두 경로는 트랜잭션 모양이 다르므로(DB 경로는 차감과 주문이 한 트랜잭션, Redis 경로는 Lua 뒤 트랜잭션과 보상) 바꿔 끼우는 단위는 재고가 아니라 구매 흐름 전체다. 구현체 둘을 설정으로 골라 if 문이 퍼지지 않게 하고, 클래스 구조는 구현 때 정한다.
 - 1주 차에는 대기열이 없으므로 입장 확인을 건너뛴다. 기준선 수치에는 대기열 비용이 포함되지 않는다는 점을 측정 기록에 적는다.
 - 측정으로 확인할 것: DB만으로 서비스 1개에서 재고 100개 1만 요청의 초과 수, 중복 수, p99. 같은 명령을 2주 차 Redis 경로와 6주 차 파드 3개에서 반복한다.
