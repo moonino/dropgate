@@ -1,5 +1,5 @@
 ---
-allowed-tools: Agent, TodoWrite, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr comment:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), mcp__github_inline_comment__create_inline_comment
+allowed-tools: Agent, TodoWrite, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), mcp__github_inline_comment__create_inline_comment, mcp__github_comment__update_claude_comment
 description: Code review a pull request
 ---
 
@@ -8,7 +8,8 @@ Provide a code review for the given pull request.
 **Agent assumptions (applies to all agents and subagents):**
 - All tools are functional and will work without error. Do not test tools or make exploratory calls. Make sure this is clear to every subagent that is launched.
 - Only call a tool if it is required to complete the task. Every tool call should have a clear purpose.
-- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh pr comment`, `gh issue view`, `gh search`. Read repository files with Read, Glob, and Grep. A command outside this list is denied, so do not attempt it.
+- When `--comment` is provided, every way this review can end must finish by updating the progress comment with `mcp__github_comment__update_claude_comment`. The body starts with the heading `## Code review` and is written in Korean. A workflow step fails the job when the latest Claude comment has no such heading, so never stop without this update, and never post the result with `gh pr comment`.
+- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh issue view`, `gh search`. Read repository files with Read, Glob, and Grep. A command outside this list is denied, so do not attempt it.
 
 To do this, follow these steps precisely:
 
@@ -16,9 +17,9 @@ To do this, follow these steps precisely:
    - The pull request is closed
    - The pull request is a draft
    - The pull request does not need code review (e.g. automated PR, trivial change that is obviously correct)
-   - Claude has already posted a review on this PR (check `gh pr view <PR> --comments` for a comment from claude containing "Code review" or review findings). The progress tracking comment created by the current workflow run does not count.
+   - Claude has already posted a review on this PR and no commit is newer than that review. Check `gh pr view <PR> --comments` for a comment from claude containing "Code review", then compare its time with the newest commit from `gh pr view <PR> --json commits`. A newer commit means the PR must be reviewed again. The progress tracking comment created by the current workflow run does not count as a review.
 
-   If any condition is true, stop and do not proceed.
+   If any condition is true, stop. When `--comment` is provided, first update the progress comment with `## Code review` and one sentence saying why the review was skipped.
 
 Note: Still review Claude generated PR's.
 
@@ -57,13 +58,13 @@ Note: Still review Claude generated PR's.
 
 6. Filter out any issues that were not validated in step 5. This step will give us our list of high signal issues for our review.
 
-7. Output a summary of the review findings to the terminal:
+7. Summarize the review findings:
    - If issues were found, list each issue with a brief description.
    - If no issues were found, state: "No issues found. Checked for bugs and AGENTS.md or CONTRIBUTING.md compliance."
 
-   If `--comment` argument was NOT provided, stop here. Do not post any GitHub comments.
+   If `--comment` argument was NOT provided, output the summary to the terminal and stop here. Do not post any GitHub comments.
 
-   If `--comment` argument IS provided and NO issues were found, post a summary comment using `gh pr comment` and stop.
+   If `--comment` argument IS provided and NO issues were found, update the progress comment with the no-issues format below and stop.
 
    If `--comment` argument IS provided and issues were found, continue to step 8.
 
@@ -76,6 +77,8 @@ Note: Still review Claude generated PR's.
    - Never post a committable suggestion UNLESS committing the suggestion fixes the issue entirely. If follow up steps are required, do not leave a committable suggestion.
 
    **IMPORTANT: Only post ONE comment per unique issue. Do not post duplicate comments.**
+
+10. Update the progress comment with `## Code review`, the number of inline comments posted, and one line per issue with its file and a brief description.
 
 Use this list when evaluating issues in Steps 4 and 5 (these are false positives, do NOT flag):
 
@@ -91,7 +94,7 @@ Notes:
 - Use gh CLI to interact with GitHub (e.g., fetch pull requests, create comments). Do not use web fetch.
 - Create a todo list before starting.
 - You must cite and link each issue in inline comments (e.g., if referring to a AGENTS.md or CONTRIBUTING.md, include a link to it).
-- If no issues are found and `--comment` argument is provided, post a comment with the following format:
+- If no issues are found and `--comment` argument is provided, update the progress comment with the following format:
 
 ---
 
