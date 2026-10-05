@@ -21,7 +21,7 @@ dropgate 저장소 규칙이다. 혼자 하는 프로젝트지만 팀 레포처�
 ## 3. 이슈
 
 - 작업 단위는 GitHub Issue다. 제목은 커밋 제목과 같은 형식에서 type을 뺀 것. 본문은 목표 한 줄과 산출물 한 줄, 해당하는 설계 문서 절.
-- 라벨: type 라벨(feat, fix, refactor, test, docs, infra, perf, chore)과 주차 라벨(w1에서 w8).
+- 라벨: type 라벨(feat, fix, refactor, test, docs, infra, perf, chore)과 주차 라벨(w1에서 w10).
 - 마일스톤은 주차(w1 10-06에서 10-12 ...).
 
 ## 4. PR

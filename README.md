@@ -1,6 +1,6 @@
 # dropgate
 
-한정판 드롭 플랫폼. 기술 실험용 B2C 개인 프로젝트. Kotlin, Spring Boot 4, Kubernetes, Redis(Sentinel, Streams), DynamoDB, Spring Batch, 카카오 OAuth2와 JWT. 2026-10-06 착수, 7주 + 버퍼 1주.
+한정판 드롭 플랫폼. 기술 실험용 B2C 개인 프로젝트. Kotlin, Spring Boot 4, Kubernetes, Redis(Sentinel, Streams), DynamoDB, Spring Batch, 카카오 OAuth2와 JWT, Spring AI 운영 비서. 2026-10-06 착수, 7주 + 버퍼 1주 + 운영 비서 2주.
 
 측정 수치 표는 구현 뒤 여기 맨 위에 온다. 질문 목록은 `docs/plan.md` 2절.
 
