@@ -58,7 +58,7 @@
 | 503 | ORDER_PERSIST_FAILED | 구매 | Lua 성공 뒤 DB 실패, Redis 보상 완료. Retry-After 2 |
 | 503 | NOTIFICATION_UNAVAILABLE | 피드 | DynamoDB 실패 |
 
-구매에서 코드가 나오는 순서는 Lua 반환 순서와 같다. DROP_NOT_OPEN, NOT_ADMITTED, ALREADY_PURCHASED, SOLD_OUT.
+구매에서 코드가 나오는 순서는 Lua 반환 순서와 같다. DROP_NOT_OPEN, NOT_ADMITTED, ALREADY_PURCHASED, SOLD_OUT. 예외로 1주 차 DB만 경로(ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 SOLD_OUT이 ALREADY_PURCHASED보다 먼저 나올 수 있다.
 
 ## 계약 테스트
 
