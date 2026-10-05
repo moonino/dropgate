@@ -10,7 +10,7 @@
 
 ## 결정
 
-Kotlin 2.x와 JDK 21 위에 Spring Boot 4.1을 쓰고, 코루틴과 가상 스레드는 쓰지 않는다. 4.1은 착수 시점의 최신 OSS 라인이다(2026-06-30 출시, OSS 지원 2027-07-31까지).
+Kotlin 2.x와 JDK 21 위에 Spring Boot 4.1을 쓰고, 코루틴과 가상 스레드는 쓰지 않는다. 4.1은 착수 시점의 최신 OSS 라인이다(v4.1.0 GitHub 릴리스 2026-06-10, OSS 지원 2027-07-31까지는 endoflife.date/spring-boot 기준).
 
 - Kotlin은 이 프로젝트가 측정 수치와 함께 코드로 남기려는 일곱 기술 중 하나다. 다른 여섯은 언어를 바꿔도 되지만 이것은 바꾸면 목적이 사라진다.
 - Spring Boot를 고른 이유는 필요한 것이 전부 한 생태계에 있어서다. 카카오 OAuth2 Client, JWT Resource Server, Spring Batch의 재시작 가능한 청크, Spring Data JPA와 JdbcTemplate, Testcontainers 통합. 이 중 하나라도 직접 만들면 7주가 모자란다.
