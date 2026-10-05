@@ -30,3 +30,14 @@ jobs:
           path: |
             **/build/reports/tests/
             **/build/reports/ktlint/
+
+  image:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [auth-service, order-service, notification-service, settlement-batch]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - run: docker build --build-arg MODULE=${{ matrix.module }} -t dropgate/${{ matrix.module }}:ci .
