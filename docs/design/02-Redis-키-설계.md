@@ -71,7 +71,7 @@ KEYS[1] stock, KEYS[2] buyers. ARGV[1] userId. `INCR stock; SREM buyers userId`.
 
 ### Redis 전체 장애 정책
 
-구매 경로에서 Redis 명령이 실패하거나 200ms를 넘으면 503 `STOCK_UNAVAILABLE`과 `Retry-After: 2`를 돌려준다. DB 경로로 폴백하지 않는다(ADR 0006). 대기열 진입과 순번 조회도 503 `STOCK_UNAVAILABLE`. 토큰 검증, 재발급, 로그아웃의 Redis 실패는 같은 정책에 코드만 503 `AUTH_UNAVAILABLE`이다. 인증이 없는 드롭 목록과 단건 조회는 DB만 보므로 계속 동작한다. 내 주문 조회는 DB만 보지만 Bearer 검증이 Redis를 거치므로 함께 503이다.
+구매 경로에서 Redis 명령이 실패하거나 200ms를 넘으면 503 `STOCK_UNAVAILABLE`과 `Retry-After: 2`를 돌려준다. DB 경로로 폴백하지 않는다(ADR 0006). 대기열 진입과 순번 조회도 503 `STOCK_UNAVAILABLE`. 토큰 검증, 재발급, 로그아웃의 Redis 실패는 같은 정책에 코드만 503 `AUTH_UNAVAILABLE`이다. Redis를 거치지 않는 드롭 목록과 단건 조회, JWKS만 계속 동작한다. 로그인 콜백과 재발급은 인증이 없어도 리프레시를 Redis에 쓰므로 503이고, 내 주문 조회는 DB만 보지만 Bearer 검증이 Redis를 거치므로 함께 503이다.
 
 ## 3. Streams (order가 쓰고 notification이 읽는다)
 

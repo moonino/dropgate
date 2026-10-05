@@ -206,6 +206,7 @@ paths:
         '200': { description: 토큰 쌍, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '502': { description: 카카오 응답 실패. code KAKAO_UNAVAILABLE, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /auth/token/refresh:
     post:
       tags: [auth]
