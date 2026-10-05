@@ -12,4 +12,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "dropgate"
-include("common", "auth-service")
+include("common", "auth-service", "order-service", "notification-service", "settlement-batch")
