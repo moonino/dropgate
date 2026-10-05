@@ -71,7 +71,8 @@ deploy/helm/*/charts/
 
 # agent and local tool state
 .omc/
-.claude/
+.claude/*
+!.claude/commands/
 CLAUDE.local.md
 *.bak-*
 
