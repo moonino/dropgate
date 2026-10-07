@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class KakaoCallbackController(private val cookies: OAuthStateCookieRepository, private val kakao: KakaoClient, private val users: UserService) {
     @GetMapping("/auth/callback/kakao")
-    fun callback(@RequestParam(defaultValue = "") code: String, request: HttpServletRequest, response: HttpServletResponse): UserResponse {
+    fun handleCallback(@RequestParam(defaultValue = "") code: String, request: HttpServletRequest, response: HttpServletResponse): UserResponse {
         cookies.removeAuthorizationRequest(request, response)
         if (code.isBlank()) throw MissingServletRequestParameterException("code", "String")
         return users.storeUser(kakao.fetchUser(code))
