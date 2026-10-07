@@ -26,7 +26,10 @@ class OAuthStateCookieRepository(
 ) : AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
     private val key = SecretKeySpec(signingKey.toByteArray().also { require(it.size >= STATE_BYTES) }, "HmacSHA256")
 
-    fun createAuthorizationRequest(): OAuth2AuthorizationRequest = kakao.createAuthorizationRequest(encode(ByteArray(STATE_BYTES).also(random::nextBytes)))
+    fun createAuthorizationRequest(): OAuth2AuthorizationRequest {
+        val stateBytes = ByteArray(STATE_BYTES).also(random::nextBytes)
+        return kakao.createAuthorizationRequest(encode(stateBytes))
+    }
 
     override fun saveAuthorizationRequest(authorizationRequest: OAuth2AuthorizationRequest, request: HttpServletRequest, response: HttpServletResponse) {
         val payload = "${authorizationRequest.state}.${clock.instant().plus(COOKIE_TTL).epochSecond}"
@@ -52,7 +55,14 @@ class OAuthStateCookieRepository(
         return authorization
     }
 
-    private fun createCookie(value: String, age: Duration): String = ResponseCookie.from(COOKIE_NAME, value).httpOnly(true).secure(true).sameSite("Lax").path("/auth").maxAge(age).build().toString()
+    private fun createCookie(value: String, age: Duration): String = ResponseCookie.from(COOKIE_NAME, value)
+        .httpOnly(true)
+        .secure(true)
+        .sameSite("Lax")
+        .path("/auth")
+        .maxAge(age)
+        .build()
+        .toString()
 
     private fun sign(payload: String): String = encode(Mac.getInstance("HmacSHA256").apply { init(key) }.doFinal(payload.toByteArray()))
 
