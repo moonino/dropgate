@@ -1,5 +1,6 @@
 package dropgate.auth.configuration
 
+import dropgate.common.UuidV7Generator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.SimpleClientHttpRequestFactory
@@ -24,4 +25,7 @@ class OAuthConfiguration {
 
     @Bean
     fun oauthRandom(): SecureRandom = SecureRandom()
+
+    @Bean
+    fun uuidV7Generator(clock: Clock, random: SecureRandom): UuidV7Generator = UuidV7Generator(clock, random)
 }
