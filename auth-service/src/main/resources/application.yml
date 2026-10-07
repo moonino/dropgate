@@ -10,3 +10,13 @@ spring:
 
 server:
   port: 8081
+
+dropgate:
+  kakao:
+    client-id: ${DROPGATE_KAKAO_CLIENT_ID}
+    client-secret: ${DROPGATE_KAKAO_CLIENT_SECRET}
+    redirect-uri: ${DROPGATE_KAKAO_REDIRECT_URI}
+    authorization-base-url: ${DROPGATE_KAKAO_AUTHORIZATION_BASE_URL:https://kauth.kakao.com}
+    token-base-url: ${DROPGATE_KAKAO_TOKEN_BASE_URL:https://kauth.kakao.com}
+    user-base-url: ${DROPGATE_KAKAO_USER_BASE_URL:https://kapi.kakao.com}
+  oauth-state-cookie-key: ${DROPGATE_OAUTH_STATE_COOKIE_KEY}

@@ -2,6 +2,7 @@
 kotlin = "2.3.21"
 spring-boot = "4.1.1"
 ktlint-gradle = "14.2.0"
+wiremock = "3.13.2"
 
 [plugins]
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -22,3 +23,5 @@ flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql
 postgresql = { module = "org.postgresql:postgresql" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+spring-security-oauth2-client = { module = "org.springframework.security:spring-security-oauth2-client" }
+wiremock = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }
