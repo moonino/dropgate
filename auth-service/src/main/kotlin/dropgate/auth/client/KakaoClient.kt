@@ -8,6 +8,8 @@ import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 
+private const val NICKNAME_MAX_LENGTH = 50
+
 @Component
 class KakaoClient(
     private val kakaoRestClient: RestClient,
@@ -38,7 +40,11 @@ class KakaoClient(
             )
             val id = user.path("id")
             require(id.isIntegralNumber && id.canConvertToLong() && id.longValue() > 0) { "카카오 사용자 ID가 유효하지 않습니다" }
-            return KakaoUserResponse(id.longValue(), user.path("kakao_account").path("profile").path("nickname").stringValue(""))
+            val nicknameNode = user.path("kakao_account").path("profile").path("nickname")
+            require(nicknameNode.isMissingNode || nicknameNode.isNull || nicknameNode.isString) { "카카오 닉네임 형식이 유효하지 않습니다" }
+            val nickname = nicknameNode.stringValue("")
+            require(nickname.codePointCount(0, nickname.length) <= NICKNAME_MAX_LENGTH) { "카카오 닉네임이 50자를 초과합니다" }
+            return KakaoUserResponse(id.longValue(), nickname)
         } catch (cause: RuntimeException) {
             throw KakaoUnavailableException(cause)
         }

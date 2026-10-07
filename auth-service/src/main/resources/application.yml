@@ -7,6 +7,9 @@ spring:
     password: ${DROPGATE_DB_AUTH_PASSWORD}
   flyway:
     schemas: auth
+  jpa:
+    hibernate:
+      ddl-auto: validate
 
 server:
   port: 8081
