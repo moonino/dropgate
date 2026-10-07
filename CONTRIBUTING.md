@@ -47,7 +47,7 @@ dropgate 저장소 규칙이다. 혼자 하는 프로젝트지만 팀 레포처�
 | 함수, 변수 | lowerCamelCase, 함수는 동사로 시작 | `admitNextBatch` |
 | 상수 | UPPER_SNAKE_CASE | `ADMIT_TTL_SECONDS` |
 | 패키지 | 소문자, 서비스.계층 | `dropgate.order.service` |
-| DB 테이블, 컬럼 | snake_case, 테이블은 복수 아닌 단수 명사 | `order_ledger`, `occurred_at` |
+| DB 테이블, 컬럼 | snake_case, 테이블 이름은 docs/design/01-ERD.md에 정한 그대로 쓴다 | `users`, `order_ledger`, `occurred_at` |
 | Redis 키 | 소문자, 콜론 구분, 소유 서비스 또는 자원이 앞 | `drop:{dropId}:stock` |
 | JSON 키 | lowerCamelCase | `remainingQuantity` |
 | URL | 소문자 kebab-case, 자원은 복수 | `/api/drops/{dropId}/queue/me` |
