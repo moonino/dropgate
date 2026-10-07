@@ -1,25 +1,24 @@
 ---
-allowed-tools: Agent, TodoWrite, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), mcp__github_inline_comment__create_inline_comment, mcp__github_comment__update_claude_comment
+allowed-tools: Agent, TodoWrite, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), mcp__github_inline_comment__create_inline_comment
 description: Code review a pull request
 ---
 
 Provide a code review for the given pull request.
 
-**Agent assumptions (applies to all agents and subagents):**
+**Subagent rules. Paste this whole block verbatim at the top of every subagent prompt:**
 - All tools are functional and will work without error. Do not test tools or make exploratory calls. Make sure this is clear to every subagent that is launched.
 - Only call a tool if it is required to complete the task. Every tool call should have a clear purpose.
-- When `--comment` is provided, every way this review can end must finish by updating the progress comment with `mcp__github_comment__update_claude_comment`. The body starts with the heading `## Code review` and is written in Korean. A workflow step fails the job when the latest Claude comment has no such heading, so never stop without this update, and never post the result with `gh pr comment`.
-- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh issue view`, `gh search`. Read repository files with Read, Glob, and Grep. A command outside this list is denied, so do not attempt it.
+- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh issue view`, `gh search`. Never use the shell to read or list files: no `find`, `ls`, `cat`, `head`, or `grep` commands. Read repository files with Read, Glob, and Grep. A command outside this list is denied, so do not attempt it.
+
+**Main agent rules:**
+- Your final message is the review and is posted to the pull request verbatim by the workflow. Every way this review can end must end with a final message whose first line is exactly `## Code review`, written in Korean. Never post the summary yourself: do not use `gh pr comment`, and do not create or update any comment other than the inline comments of step 9.
+- Run every agent in the foreground and use its returned result in the same turn. Never launch an agent in the background and never end a turn to wait for agents, because the process exits when the turn ends and the review is lost.
+- Run every step below regardless of the diff size. A small diff is not a reason to skip the review agents.
+- Every subagent prompt starts with the subagent rules above, copied word for word, followed by the PR title and description.
 
 To do this, follow these steps precisely:
 
-1. Launch a claude-sonnet-5-5 agent to check if any of the following are true:
-   - The pull request is closed
-   - The pull request is a draft
-   - The pull request does not need code review (e.g. automated PR, trivial change that is obviously correct)
-   - Claude has already posted a review on this PR and no commit is newer than that review. Check `gh pr view <PR> --comments` for a comment from claude containing "Code review", then compare its time with the newest commit from `gh pr view <PR> --json commits`. A newer commit means the PR must be reviewed again. The progress tracking comment created by the current workflow run does not count as a review.
-
-   If any condition is true, stop. When `--comment` is provided, first update the progress comment with `## Code review` and one sentence saying why the review was skipped.
+1. Record the pull request URL from the arguments. The workflow runs only for open, non-draft pull requests from this repository and reviews every push, so do not check whether the pull request is closed, a draft, trivial, or already reviewed.
 
 Note: Still review Claude generated PR's.
 
@@ -62,9 +61,7 @@ Note: Still review Claude generated PR's.
    - If issues were found, list each issue with a brief description.
    - If no issues were found, state: "No issues found. Checked for bugs and AGENTS.md or CONTRIBUTING.md compliance."
 
-   If `--comment` argument was NOT provided, output the summary to the terminal and stop here. Do not post any GitHub comments.
-
-   If `--comment` argument IS provided and NO issues were found, update the progress comment with the no-issues format below and stop.
+   If `--comment` argument was NOT provided, or NO issues were found, skip to step 10. Do not post any inline comments.
 
    If `--comment` argument IS provided and issues were found, continue to step 8.
 
@@ -78,7 +75,7 @@ Note: Still review Claude generated PR's.
 
    **IMPORTANT: Only post ONE comment per unique issue. Do not post duplicate comments.**
 
-10. Update the progress comment with `## Code review`, the number of inline comments posted, and one line per issue with its file and a brief description.
+10. End with the final message in the format below. The first line is exactly `## Code review`. If issues were found, list one line per issue with its file, a brief description, and whether an inline comment was posted. If no issues were found, use the no-issues sentence. Write the message in Korean.
 
 Use this list when evaluating issues in Steps 4 and 5 (these are false positives, do NOT flag):
 
@@ -91,16 +88,16 @@ Use this list when evaluating issues in Steps 4 and 5 (these are false positives
 
 Notes:
 
-- Use gh CLI to interact with GitHub (e.g., fetch pull requests, create comments). Do not use web fetch.
+- Use the allowed gh commands to read GitHub (pull requests, diffs, issues). Do not use web fetch.
 - Create a todo list before starting.
 - You must cite and link each issue in inline comments (e.g., if referring to a AGENTS.md or CONTRIBUTING.md, include a link to it).
-- If no issues are found and `--comment` argument is provided, update the progress comment with the following format:
+- The final message always follows this format:
 
 ---
 
 ## Code review
 
-No issues found. Checked for bugs and AGENTS.md or CONTRIBUTING.md compliance.
+발견한 문제가 없습니다. 버그와 AGENTS.md, CONTRIBUTING.md 준수 여부를 확인했습니다.
 
 ---
 
