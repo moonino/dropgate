@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpHeaders
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -47,7 +48,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
 
     @Test
     fun `로그인은 state 쿠키와 카카오 인가 URL을 302로 돌려준다`() {
-        val headers = http.get().uri("/auth/login/kakao").exchange().expectStatus().isFound.returnResult(Void::class.java).responseHeaders
+        val headers = requestLogin()
         val query = UriComponentsBuilder.fromUriString(headers.location.toString()).build().queryParams
         val cookie = headers.getFirst("Set-Cookie")!!
         assertThat(headers.location.toString()).startsWith(wiremock.baseUrl() + "/oauth/authorize?")
@@ -93,7 +94,12 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     @ParameterizedTest
     @ValueSource(ints = [500, 200])
     fun `카카오 실패나 3초 초과를 맥락 있는 예외로 바꾼다`(status: Int) {
-        wiremock.stubFor(WireMock.post("/oauth/token").willReturn(WireMock.aResponse().withStatus(status).withBody("""{"access_token":"access"}""").withHeader("Content-Type", "application/json").withFixedDelay(if (status == 200) 3500 else 0)))
+        val tokenResponse = WireMock.aResponse()
+            .withStatus(status)
+            .withBody("""{"access_token":"access"}""")
+            .withHeader("Content-Type", "application/json")
+            .withFixedDelay(if (status == 200) 3500 else 0)
+        wiremock.stubFor(WireMock.post("/oauth/token").willReturn(tokenResponse))
         val failure = assertThatThrownBy { kakao.fetchUser("code") }.isInstanceOf(KakaoUnavailableException::class.java)
         if (status == 200) failure.hasRootCauseInstanceOf(SocketTimeoutException::class.java)
     }
@@ -101,7 +107,10 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     @Test
     fun `콜백은 새 사용자를 저장하고 UUID v7 사용자 응답을 돌려준다`() {
         stubKakaoUser("""{"id":1234567,"kakao_account":{"profile":{"nickname":"테스터"}}}""")
-        val response = callCallback().expectStatus().isOk.expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*").expectBody()
+        val response = callCallback()
+            .expectStatus().isOk
+            .expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
+            .expectBody()
         response.jsonPath("$.nickname").isEqualTo("테스터").jsonPath("$.role").isEqualTo("USER")
         val id = jdbc.sql("SELECT id FROM auth.users WHERE kakao_id=1234567").query(UUID::class.java).single()
         assertThat(id.version()).isEqualTo(7)
@@ -112,11 +121,18 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     fun `같은 카카오 사용자면 마지막 로그인 시각만 갱신한다`() {
         val id = UUID.randomUUID()
         val before = Instant.parse("2026-01-01T00:00:00Z")
-        jdbc.sql("INSERT INTO auth.users VALUES (:id,1234567,'원래 이름','ADMIN',:before,:before)").param("id", id).param("before", java.sql.Timestamp.from(before)).update()
+        jdbc.sql("INSERT INTO auth.users VALUES (:id,1234567,'원래 이름','ADMIN',:before,:before)")
+            .param("id", id)
+            .param("before", java.sql.Timestamp.from(before))
+            .update()
         stubKakaoUser("""{"id":1234567,"kakao_account":{"profile":{"nickname":"바뀐 이름"}}}""")
         callCallback().expectStatus().isOk.expectBody().jsonPath("$.id").isEqualTo(id.toString())
             .jsonPath("$.nickname").isEqualTo("원래 이름").jsonPath("$.role").isEqualTo("ADMIN")
-        val row = jdbc.sql("SELECT created_at,last_login_at FROM auth.users").query { rs, _ -> rs.getTimestamp(1).toInstant() to rs.getTimestamp(2).toInstant() }.single()
+        val row = jdbc.sql("SELECT created_at,last_login_at FROM auth.users")
+            .query { resultSet, _ ->
+                resultSet.getTimestamp("created_at").toInstant() to
+                    resultSet.getTimestamp("last_login_at").toInstant()
+            }.single()
         assertThat(row.first).isEqualTo(before)
         assertThat(row.second).isAfter(before)
         assertThat(jdbc.sql("SELECT count(*) FROM auth.users").query(Long::class.java).single()).isEqualTo(1)
@@ -131,8 +147,12 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     @ParameterizedTest
     @ValueSource(strings = ["", " "])
     fun `인가 코드가 비면 쿠키를 지우고 400을 돌려준다`(code: String) {
-        callCallback(code).expectStatus().isBadRequest.expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
-            .expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED").jsonPath("$.errors[0].field").isEqualTo("code")
+        callCallback(code)
+            .expectStatus().isBadRequest
+            .expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
+            .expectBody()
+            .jsonPath("$.code").isEqualTo("VALIDATION_FAILED")
+            .jsonPath("$.errors[0].field").isEqualTo("code")
         assertThat(wiremock.allServeEvents).isEmpty()
     }
 
@@ -155,9 +175,13 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
 
     @Test
     fun `state가 다르면 카카오를 호출하지 않고 400을 돌려준다`() {
-        val callback = createCallbackRequest(cookies)
-        http.get().uri("/auth/callback/kakao?code=code&state=different").cookie("dropgate_oauth_state", callback.cookies!!.single().value)
-            .exchange().expectStatus().isBadRequest.expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED")
+        val headers = requestLogin()
+        http.get()
+            .uri("/auth/callback/kakao?code=code&state=different")
+            .cookie("dropgate_oauth_state", readStateCookie(headers))
+            .exchange()
+            .expectStatus().isBadRequest
+            .expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED")
             .jsonPath("$.errors[0].field").isEqualTo("state")
         assertThat(wiremock.allServeEvents).isEmpty()
     }
@@ -166,9 +190,16 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     @ValueSource(ints = [500, 200])
     fun `카카오 실패나 읽기 시간 초과면 쿠키를 지우고 502를 돌려준다`(status: Int) {
         stubKakaoUser("""{"id":1234567}""")
-        wiremock.stubFor(WireMock.get("/v2/user/me").willReturn(WireMock.okJson("""{"id":1234567}""").withStatus(status).withFixedDelay(if (status == 200) 3500 else 0)))
-        callCallback().expectStatus().isEqualTo(502).expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
-            .expectBody().jsonPath("$.code").isEqualTo("KAKAO_UNAVAILABLE").jsonPath("$.errors").isArray
+        val userResponse = WireMock.okJson("""{"id":1234567}""")
+            .withStatus(status)
+            .withFixedDelay(if (status == 200) 3500 else 0)
+        wiremock.stubFor(WireMock.get("/v2/user/me").willReturn(userResponse))
+        callCallback()
+            .expectStatus().isEqualTo(502)
+            .expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
+            .expectBody()
+            .jsonPath("$.code").isEqualTo("KAKAO_UNAVAILABLE")
+            .jsonPath("$.errors").isArray
         assertThat(jdbc.sql("SELECT count(*) FROM auth.users").query(Long::class.java).single()).isZero()
     }
 
@@ -178,10 +209,22 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     }
 
     private fun callCallback(code: String = "code"): RestTestClient.ResponseSpec {
-        val callback = createCallbackRequest(cookies)
-        return http.get().uri("/auth/callback/kakao?code=$code&state=${callback.getParameter("state")}")
-            .cookie("dropgate_oauth_state", callback.cookies!!.single().value).exchange()
+        val headers = requestLogin()
+        val state = UriComponentsBuilder.fromUriString(headers.location.toString())
+            .build().queryParams.getFirst("state")!!
+        return http.get()
+            .uri("/auth/callback/kakao?code=$code&state=$state")
+            .cookie("dropgate_oauth_state", readStateCookie(headers))
+            .exchange()
     }
+
+    private fun requestLogin(): HttpHeaders = http.get()
+        .uri("/auth/login/kakao")
+        .exchange()
+        .expectStatus().isFound
+        .returnResult(Void::class.java).responseHeaders
+
+    private fun readStateCookie(headers: HttpHeaders): String = headers.getFirst("Set-Cookie")!!.substringAfter('=').substringBefore(';')
 
     private fun createCallbackRequest(repository: OAuthStateCookieRepository): MockHttpServletRequest {
         val authorization = repository.createAuthorizationRequest()

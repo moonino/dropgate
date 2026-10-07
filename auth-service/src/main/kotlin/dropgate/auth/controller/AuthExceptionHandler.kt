@@ -11,15 +11,28 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 @RestControllerAdvice
 class AuthExceptionHandler {
     @ExceptionHandler(InvalidStateException::class)
-    fun handleState(exception: InvalidStateException): ResponseEntity<ErrorResponse> = createValidationResponse("state", exception.message.orEmpty())
+    fun handleState(exception: InvalidStateException): ResponseEntity<ErrorResponse> = createValidationResponse(
+        field = "state",
+        message = exception.message.orEmpty(),
+    )
 
     @ExceptionHandler(MissingServletRequestParameterException::class)
-    fun handleMissingParameter(exception: MissingServletRequestParameterException): ResponseEntity<ErrorResponse> = createValidationResponse(exception.parameterName, "필수 로그인 값이 없습니다")
+    fun handleMissingParameter(exception: MissingServletRequestParameterException): ResponseEntity<ErrorResponse> = createValidationResponse(
+        field = exception.parameterName,
+        message = "필수 로그인 값이 없습니다",
+    )
 
     @ExceptionHandler(KakaoUnavailableException::class)
-    fun handleKakao(exception: KakaoUnavailableException): ResponseEntity<ErrorResponse> = ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ErrorResponse("KAKAO_UNAVAILABLE", exception.message.orEmpty()))
+    fun handleKakao(exception: KakaoUnavailableException): ResponseEntity<ErrorResponse> {
+        val error = ErrorResponse("KAKAO_UNAVAILABLE", exception.message.orEmpty())
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(error)
+    }
 
-    private fun createValidationResponse(field: String, message: String): ResponseEntity<ErrorResponse> = ResponseEntity.badRequest().body(ErrorResponse("VALIDATION_FAILED", message, listOf(FieldErrorResponse(field, message))))
+    private fun createValidationResponse(field: String, message: String): ResponseEntity<ErrorResponse> {
+        val errors = listOf(FieldErrorResponse(field, message))
+        val error = ErrorResponse("VALIDATION_FAILED", message, errors)
+        return ResponseEntity.badRequest().body(error)
+    }
 }
 
 data class ErrorResponse(val code: String, val message: String, val errors: List<FieldErrorResponse> = emptyList())
