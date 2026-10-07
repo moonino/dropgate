@@ -1,6 +1,12 @@
 spring:
   application:
     name: auth-service
+  datasource:
+    url: ${DROPGATE_DB_URL}
+    username: auth_user
+    password: ${DROPGATE_DB_AUTH_PASSWORD}
+  flyway:
+    schemas: auth
 
 server:
   port: 8081
