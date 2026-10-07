@@ -34,18 +34,18 @@ cat > "$workdir/array.json" <<'JSON'
   {"type": "result", "subtype": "success", "result": "## Code review\n\n문제를 찾지 못했다."}
 ]
 JSON
-assert_passes "배열 입력에서 마지막 result 본문을 돌려준다" "$workdir/array.json" $'## Code review\n\n문제를 찾지 못했다.'
+assert_passes "배열 입력에서 마지막 result 본문을 돌려준다" "$workdir/array.json" $'## Code review\n\nClaude Code(Opus 5.5) 자동 리뷰 결과다. 인라인 지적은 claude[bot]이 달고 이 요약은 워크플로가 올린다.\n\n문제를 찾지 못했다.'
 
 cat > "$workdir/object.json" <<'JSON'
 {"type": "result", "subtype": "success", "result": "## Code review\n\n지적 1건."}
 JSON
-assert_passes "단일 result 객체 입력도 받는다" "$workdir/object.json" $'## Code review\n\n지적 1건.'
+assert_passes "단일 result 객체 입력도 받는다" "$workdir/object.json" $'## Code review\n\nClaude Code(Opus 5.5) 자동 리뷰 결과다. 인라인 지적은 claude[bot]이 달고 이 요약은 워크플로가 올린다.\n\n지적 1건.'
 
 cat > "$workdir/stream.jsonl" <<'JSON'
 {"type": "system", "subtype": "init"}
 {"type": "result", "subtype": "success", "result": "## Code review\n\n줄 단위 입력."}
 JSON
-assert_passes "줄 단위 JSON 입력도 받는다" "$workdir/stream.jsonl" $'## Code review\n\n줄 단위 입력.'
+assert_passes "줄 단위 JSON 입력도 받는다" "$workdir/stream.jsonl" $'## Code review\n\nClaude Code(Opus 5.5) 자동 리뷰 결과다. 인라인 지적은 claude[bot]이 달고 이 요약은 워크플로가 올린다.\n\n줄 단위 입력.'
 
 cat > "$workdir/no-heading.json" <<'JSON'
 [{"type": "result", "subtype": "success", "result": "Waiting for the review agents."}]

@@ -1,5 +1,5 @@
 ---
-allowed-tools: Agent, TodoWrite, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), mcp__github_inline_comment__create_inline_comment
+allowed-tools: Agent, TodoWrite, Bash(gh issue view:*), Bash(gh search:*), Bash(gh issue list:*), Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr list:*), Bash(find:*), mcp__github_inline_comment__create_inline_comment
 description: Code review a pull request
 ---
 
@@ -8,7 +8,7 @@ Provide a code review for the given pull request.
 **Subagent rules. Paste this whole block verbatim at the top of every subagent prompt:**
 - All tools are functional and will work without error. Do not test tools or make exploratory calls. Make sure this is clear to every subagent that is launched.
 - Only call a tool if it is required to complete the task. Every tool call should have a clear purpose.
-- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh issue view`, `gh search`. Never use the shell to read or list files: no `find`, `ls`, `cat`, `head`, or `grep` commands. Read repository files with Read, Glob, and Grep. A command outside this list is denied, so do not attempt it.
+- Shell access is limited to these commands, each run alone without `;`, `&&`, `|`, `cd`, `echo`, `git`, or `gh api`: `gh pr view`, `gh pr diff`, `gh pr list`, `gh issue view`, `gh search`, and `find` to locate files. Read file contents with the Read tool. The Glob and Grep tools do not exist in this session, so never call them. A command outside this list is denied, so do not attempt it.
 
 **Main agent rules:**
 - Your final message is the review and is posted to the pull request verbatim by the workflow. Every way this review can end must end with a final message whose first line is exactly `## Code review`, written in Korean. Never post the summary yourself: do not use `gh pr comment`, and do not create or update any comment other than the inline comments of step 9.
@@ -24,7 +24,7 @@ Note: Still review Claude generated PR's.
 
 2. Launch a claude-sonnet-5-5 agent to return a list of file paths (not their contents) for all relevant rule files including:
    - The root AGENTS.md and CONTRIBUTING.md files, if they exist
-   - Any AGENTS.md files in directories containing files modified by the pull request
+   - Any AGENTS.md files in directories containing files modified by the pull request. Locate them with `find <directory> -maxdepth 1 -name AGENTS.md`
 
 3. Launch a claude-sonnet-5-5 agent to view the pull request and return a summary of the changes
 
