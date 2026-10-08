@@ -28,7 +28,7 @@ Note: Still review Claude generated PR's.
 
 3. Launch a claude-sonnet-5-5 agent to view the pull request and return a summary of the changes
 
-4. Launch 5 agents in parallel to independently review the changes. Agents 1 to 4 return issues; agent 5 returns suggestions, which are not issues. Each agent should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "AGENTS.md or CONTRIBUTING.md adherence", "bug"). The agents should do the following:
+4. Launch 5 agents in parallel to independently review the changes. Agents 1 to 4 return issues; agent 5 returns suggestions, which are not issues. Agents 1 to 4 should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "AGENTS.md or CONTRIBUTING.md adherence", "bug"). The agents should do the following:
 
    Agents 1 + 2: rule compliance claude-opus-5-5 agents
    Audit changes for AGENTS.md and CONTRIBUTING.md compliance in parallel. Note: When evaluating compliance for a file, you should only consider rule files that share a file path with the file or parents. CONTRIBUTING.md applies to every file.
@@ -40,7 +40,7 @@ Note: Still review Claude generated PR's.
    Look for problems that exist in the introduced code. This could be security issues, incorrect logic, etc. Only look for issues that fall within the changed code.
 
    Agent 5: claude-opus-5-5 suggestion agent (parallel subagent with agents 3 and 4). Launch it on every review, also when the diff has no source code.
-   Read the full diff and return at most 3 suggestions about readability or design in the introduced changes. Look for: the same condition checked twice, a name that hides the role of a thing, a DTO or helper used outside its role, a test that checks several concepts, a function that does two things. Each suggestion names the file and line, says in one or two sentences what to change and why, and must be fixable in under ten minutes. Return only suggestions you are confident a senior engineer would make in a review. If nothing is worth saying, return an empty list. Suggestions skip step 5, never become inline comments, and never block the review.
+   Read the full diff and return at most 3 suggestions about readability or design in the introduced changes. Look for: the same condition checked twice, a name that hides the role of a thing, a DTO or helper used outside its role, a test that checks several concepts, a function that does two things. Each suggestion names the file and line, says in one or two sentences what to change and why, and must be fixable in under ten minutes. Return only suggestions you are confident a senior engineer would make in a review. If nothing is worth saying, return an empty list.
 
    **CRITICAL: Agents 1 to 4 only want HIGH SIGNAL issues.** Flag issues where:
    - The code will fail to compile or parse (syntax errors, type errors, missing imports, unresolved references)
@@ -63,7 +63,7 @@ Note: Still review Claude generated PR's.
 7. Summarize the review findings:
    - If issues were found, list each issue with a brief description.
    - If no issues were found, state: "No issues found. Checked for bugs and AGENTS.md or CONTRIBUTING.md compliance."
-   - Keep the suggestions from agent 5 separate from the issues. They are listed only in the final message of step 10 and do not count as issues in the steps below.
+   - Keep the suggestions from agent 5 separate from the issues. They skip step 5, never become inline comments, never block the review, and are listed only in the final message of step 10.
 
    If `--comment` argument was NOT provided, or NO issues were found, skip to step 10. Do not post any inline comments.
 
