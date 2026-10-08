@@ -26,4 +26,5 @@ postgresql = { module = "org.postgresql:postgresql" }
 spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 spring-security-oauth2-client = { module = "org.springframework.security:spring-security-oauth2-client" }
+spring-security-oauth2-jose = { module = "org.springframework.security:spring-security-oauth2-jose" }
 wiremock = { module = "org.wiremock:wiremock-standalone", version.ref = "wiremock" }

@@ -15,6 +15,8 @@ server:
   port: 8081
 
 dropgate:
+  jwt:
+    private-key-pem: ${DROPGATE_JWT_PRIVATE_KEY_PEM:}
   kakao:
     client-id: ${DROPGATE_KAKAO_CLIENT_ID}
     client-secret: ${DROPGATE_KAKAO_CLIENT_SECRET}

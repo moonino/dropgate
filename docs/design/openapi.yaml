@@ -37,8 +37,8 @@ components:
       type: object
       required: [accessToken, refreshToken, expiresIn, tokenType]
       properties:
-        accessToken: { type: string }
-        refreshToken: { type: string }
+        accessToken: { type: string, description: "RS256 JWT. 15분 유효, sub, role, jti, iss, iat, exp 포함" }
+        refreshToken: { type: string, description: "같은 키로 서명한 RS256 JWT. 14일 유효, sub, jti, iss, iat, exp, typ refresh 포함" }
         expiresIn: { type: integer, example: 900 }
         tokenType: { type: string, example: Bearer }
     User:
@@ -50,14 +50,16 @@ components:
         role: { type: string, enum: [USER, ADMIN] }
     Jwks:
       type: object
+      required: [keys]
       properties:
         keys:
           type: array
           items:
             type: object
+            required: [kty, kid, use, alg, n, e]
             properties:
               kty: { type: string, example: RSA }
-              kid: { type: string }
+              kid: { type: string, description: 공개키의 RFC 7638 SHA-256 thumbprint }
               use: { type: string, example: sig }
               alg: { type: string, example: RS256 }
               n: { type: string }
