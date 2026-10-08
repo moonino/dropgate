@@ -11,7 +11,7 @@ import org.springframework.test.web.servlet.client.RestTestClient
 @SpringBootTest(classes = [AuthServiceApplication::class], webEnvironment = RANDOM_PORT)
 @AutoConfigureRestTestClient
 @Import(PostgresTestcontainersConfiguration::class)
-class AuthServiceHealthTest {
+class AuthServiceHealthTest : JwtIntegrationTest() {
     @Autowired
     lateinit var restTestClient: RestTestClient
 

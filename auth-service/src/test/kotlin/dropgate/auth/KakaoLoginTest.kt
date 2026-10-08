@@ -2,6 +2,9 @@ package dropgate.auth
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
+import com.nimbusds.jose.crypto.RSASSAVerifier
+import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
 import dropgate.auth.client.KakaoUnavailableException
 import dropgate.auth.repository.InvalidStateException
@@ -37,7 +40,7 @@ import java.util.concurrent.Executors
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
 @Import(PostgresTestcontainersConfiguration::class)
-class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, private val kakao: KakaoClient, private val jdbc: JdbcClient) {
+class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, private val kakao: KakaoClient, private val jdbc: JdbcClient) : JwtIntegrationTest() {
     private val cookies = OAuthStateCookieRepository(kakao, "test-cookie-signing-key-32-bytes-long", Clock.systemUTC(), SecureRandom())
 
     @BeforeEach
@@ -105,16 +108,62 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     }
 
     @Test
-    fun `콜백은 새 사용자를 저장하고 UUID v7 사용자 응답을 돌려준다`() {
+    fun `콜백은 새 사용자를 저장하고 Bearer 토큰 쌍을 돌려준다`() {
         stubKakaoUser("""{"id":1234567,"kakao_account":{"profile":{"nickname":"테스터"}}}""")
         val response = callCallback()
             .expectStatus().isOk
             .expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
             .expectBody()
-        response.jsonPath("$.nickname").isEqualTo("테스터").jsonPath("$.role").isEqualTo("USER")
+        response.jsonPath("$.accessToken").isNotEmpty.jsonPath("$.refreshToken").isNotEmpty
+            .jsonPath("$.expiresIn").isEqualTo(900).jsonPath("$.tokenType").isEqualTo("Bearer")
         val id = jdbc.sql("SELECT id FROM auth.users WHERE kakao_id=1234567").query(UUID::class.java).single()
         assertThat(id.version()).isEqualTo(7)
-        response.jsonPath("$.id").isEqualTo(id.toString())
+        assertThat(jdbc.sql("SELECT nickname FROM auth.users").query(String::class.java).single()).isEqualTo("테스터")
+    }
+
+    @Test
+    fun `액세스 토큰은 JWKS로 검증되고 저장된 사용자 클레임을 담는다`() {
+        val token = SignedJWT.parse(requestTokenPair()["accessToken"] as String)
+        val key = RSAKey.parse(requestJwks().single())
+        assertThat(token.verify(RSASSAVerifier(key))).isTrue()
+        assertThat(token.header.algorithm.name).isEqualTo("RS256")
+        assertThat(token.header.keyID).isEqualTo(key.keyID)
+        val claims = token.jwtClaimsSet
+        assertThat(claims.subject).isEqualTo(jdbc.sql("SELECT id FROM auth.users").query(UUID::class.java).single().toString())
+        assertThat(claims.getStringClaim("role")).isEqualTo("USER")
+        assertThat(claims.issuer).isEqualTo("dropgate-auth")
+        assertThat(UUID.fromString(claims.jwtid).version()).isEqualTo(7)
+    }
+
+    @Test
+    fun `액세스 토큰은 발급 시각부터 15분 뒤 만료된다`() {
+        val claims = SignedJWT.parse(requestTokenPair()["accessToken"] as String).jwtClaimsSet
+        assertThat(Duration.between(claims.issueTime.toInstant(), claims.expirationTime.toInstant())).isEqualTo(Duration.ofMinutes(15))
+    }
+
+    @Test
+    fun `리프레시 토큰은 같은 키로 서명하고 별도 식별자로 14일간 유효하다`() {
+        val pair = requestTokenPair()
+        val access = SignedJWT.parse(pair["accessToken"] as String)
+        val refresh = SignedJWT.parse(pair["refreshToken"] as String)
+        assertThat(refresh.verify(RSASSAVerifier(RSAKey.parse(requestJwks().single())))).isTrue()
+        assertThat(refresh.header.algorithm).isEqualTo(access.header.algorithm)
+        assertThat(refresh.header.keyID).isEqualTo(access.header.keyID)
+        val claims = refresh.jwtClaimsSet
+        assertThat(claims.subject).isEqualTo(access.jwtClaimsSet.subject)
+        assertThat(claims.issuer).isEqualTo("dropgate-auth")
+        assertThat(claims.getStringClaim("typ")).isEqualTo("refresh")
+        assertThat(claims.jwtid).isNotEqualTo(access.jwtClaimsSet.jwtid)
+        assertThat(UUID.fromString(claims.jwtid).version()).isEqualTo(7)
+        assertThat(Duration.between(claims.issueTime.toInstant(), claims.expirationTime.toInstant())).isEqualTo(Duration.ofDays(14))
+    }
+
+    @Test
+    fun `JWKS는 thumbprint 식별자를 가진 서명 공개키 하나만 노출한다`() {
+        val key = requestJwks().single()
+        assertThat(key.keys).containsExactlyInAnyOrder("kty", "use", "alg", "n", "e", "kid")
+        assertThat(key).containsEntry("kty", "RSA").containsEntry("use", "sig").containsEntry("alg", "RS256")
+        assertThat(key["kid"]).isEqualTo(RSAKey.parse(key).computeThumbprint().toString())
     }
 
     @Test
@@ -126,8 +175,11 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             .param("before", java.sql.Timestamp.from(before))
             .update()
         stubKakaoUser("""{"id":1234567,"kakao_account":{"profile":{"nickname":"바뀐 이름"}}}""")
-        callCallback().expectStatus().isOk.expectBody().jsonPath("$.id").isEqualTo(id.toString())
-            .jsonPath("$.nickname").isEqualTo("원래 이름").jsonPath("$.role").isEqualTo("ADMIN")
+        val pair = callCallback().expectStatus().isOk.expectBody(Map::class.java).returnResult().responseBody!!
+        assertThat(SignedJWT.parse(pair["accessToken"] as String).jwtClaimsSet.getStringClaim("role")).isEqualTo("ADMIN")
+        assertThat(jdbc.sql("SELECT id FROM auth.users").query(UUID::class.java).single()).isEqualTo(id)
+        assertThat(jdbc.sql("SELECT nickname FROM auth.users").query(String::class.java).single()).isEqualTo("원래 이름")
+        assertThat(jdbc.sql("SELECT role FROM auth.users").query(String::class.java).single()).isEqualTo("ADMIN")
         val row = jdbc.sql("SELECT created_at,last_login_at FROM auth.users")
             .query { resultSet, _ ->
                 resultSet.getTimestamp("created_at").toInstant() to
@@ -141,7 +193,8 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     @Test
     fun `닉네임이 없으면 사용자 ID 뒤 여섯 자리를 붙인다`() {
         stubKakaoUser("""{"id":1234567}""")
-        callCallback().expectStatus().isOk.expectBody().jsonPath("$.nickname").isEqualTo("user234567")
+        callCallback().expectStatus().isOk
+        assertThat(jdbc.sql("SELECT nickname FROM auth.users").query(String::class.java).single()).isEqualTo("user234567")
     }
 
     @ParameterizedTest
@@ -208,6 +261,14 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
         wiremock.stubFor(WireMock.get("/v2/user/me").willReturn(WireMock.okJson(body)))
     }
 
+    private fun requestTokenPair(): Map<*, *> {
+        stubKakaoUser("""{"id":1234567}""")
+        return callCallback().expectStatus().isOk.expectBody(Map::class.java).returnResult().responseBody!!
+    }
+
+    private fun requestJwks(): List<Map<String, Any>> = http.get().uri("/.well-known/jwks.json").exchange().expectStatus().isOk
+        .expectBody(JwksTestResponse::class.java).returnResult().responseBody!!.keys
+
     private fun callCallback(code: String = "code"): RestTestClient.ResponseSpec {
         val headers = requestLogin()
         val state = UriComponentsBuilder.fromUriString(headers.location.toString())
@@ -250,3 +311,5 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
         fun stopKakao() = wiremock.stop()
     }
 }
+
+data class JwksTestResponse(val keys: List<Map<String, Any>>)
