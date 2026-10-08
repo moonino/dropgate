@@ -239,6 +239,7 @@ paths:
     get:
       tags: [auth]
       summary: 내 정보
+      description: 액세스 토큰의 사용자 정보를 조회한다. 토큰 누락, 서명 불일치, 만료, 다른 발급자, 리프레시 토큰, 사용자 없음은 401 UNAUTHENTICATED다.
       security: [ { bearer: [] } ]
       responses:
         '200': { description: 사용자, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }

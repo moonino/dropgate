@@ -2,11 +2,16 @@ package dropgate.auth
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
+import com.nimbusds.jose.JWSAlgorithm
+import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.RSAKey
+import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
 import dropgate.auth.client.KakaoUnavailableException
+import dropgate.auth.configuration.JwtConfiguration
 import dropgate.auth.repository.InvalidStateException
 import dropgate.auth.repository.OAuthStateCookieRepository
 import jakarta.servlet.http.Cookie
@@ -34,6 +39,7 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.Date
 import java.util.UUID
 import java.util.concurrent.Executors
 
@@ -166,6 +172,75 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
         assertThat(key["kid"]).isEqualTo(RSAKey.parse(key).computeThumbprint().toString())
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["Bearer", "bearer"])
+    fun `내 정보는 정상 토큰의 사용자를 DB에서 조회한다`(scheme: String) {
+        val token = requestTokenPair()["accessToken"] as String
+        jdbc.sql("UPDATE auth.users SET nickname='변경한 이름', role='ADMIN'").update()
+        http.get().uri("/auth/me").header(HttpHeaders.AUTHORIZATION, "$scheme $token").exchange()
+            .expectStatus().isOk.expectBody().jsonPath("$.id").isEqualTo(SignedJWT.parse(token).jwtClaimsSet.subject)
+            .jsonPath("$.nickname").isEqualTo("변경한 이름").jsonPath("$.role").isEqualTo("ADMIN")
+    }
+
+    @Test
+    fun `내 정보는 인증 헤더가 없으면 401을 돌려준다`() {
+        assertUnauthenticated(http.get().uri("/auth/me").exchange())
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["Bearer", "Basic token", "Bearer invalid.jwt.token", "Bearer token extra"])
+    fun `내 정보는 잘못된 인증 헤더나 토큰이면 401을 돌려준다`(header: String) {
+        assertUnauthenticated(http.get().uri("/auth/me").header(HttpHeaders.AUTHORIZATION, header).exchange())
+    }
+
+    @Test
+    fun `내 정보는 다른 키로 서명한 토큰이면 401을 돌려준다`() {
+        val otherKey = JwtConfiguration().jwtSigningKey(generatePrivateKeyPem())
+        assertUnauthenticated(requestCurrentUser(signAccessToken(otherKey)))
+    }
+
+    @Test
+    fun `내 정보는 RS256 이외의 알고리즘이면 401을 돌려준다`() {
+        assertUnauthenticated(requestCurrentUser(signAccessToken(algorithm = JWSAlgorithm.RS512)))
+    }
+
+    @Test
+    fun `내 정보는 만료된 토큰이면 401을 돌려준다`() {
+        val expired = signAccessToken {
+            issueTime(Date.from(Instant.now().minus(Duration.ofMinutes(15))))
+            expirationTime(Date.from(Instant.now().minusSeconds(1)))
+        }
+        assertUnauthenticated(requestCurrentUser(expired))
+    }
+
+    @Test
+    fun `내 정보는 다른 발급자의 토큰이면 401을 돌려준다`() {
+        assertUnauthenticated(requestCurrentUser(signAccessToken { issuer("other-auth") }))
+    }
+
+    @Test
+    fun `내 정보는 리프레시 토큰이면 401을 돌려준다`() {
+        assertUnauthenticated(requestCurrentUser(requestTokenPair()["refreshToken"] as String))
+    }
+
+    @Test
+    fun `내 정보는 사용자가 삭제됐으면 401을 돌려준다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        jdbc.sql("DELETE FROM auth.users").update()
+        assertUnauthenticated(requestCurrentUser(token))
+    }
+
+    @Test
+    fun `내 정보는 만료 시각이 없으면 401을 돌려준다`() {
+        assertUnauthenticated(requestCurrentUser(signAccessToken { expirationTime(null) }))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "not-a-uuid", "1-1-1-1-1"])
+    fun `내 정보는 사용자 식별자가 없거나 UUID가 아니면 401을 돌려준다`(subject: String) {
+        assertUnauthenticated(requestCurrentUser(signAccessToken { subject(subject.ifEmpty { null }) }))
+    }
+
     @Test
     fun `같은 카카오 사용자면 마지막 로그인 시각만 갱신한다`() {
         val id = UUID.randomUUID()
@@ -264,6 +339,25 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     private fun requestTokenPair(): Map<*, *> {
         stubKakaoUser("""{"id":1234567}""")
         return callCallback().expectStatus().isOk.expectBody(Map::class.java).returnResult().responseBody!!
+    }
+
+    private fun requestCurrentUser(token: String): RestTestClient.ResponseSpec = http.get().uri("/auth/me")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer $token").exchange()
+
+    private fun assertUnauthenticated(response: RestTestClient.ResponseSpec) {
+        response.expectStatus().isUnauthorized.expectBody().jsonPath("$.code").isEqualTo("UNAUTHENTICATED")
+            .jsonPath("$.message").isEqualTo("로그인이 필요합니다").jsonPath("$.errors").isEqualTo(emptyList<Any>())
+    }
+
+    private fun signAccessToken(
+        key: RSAKey = JwtConfiguration().jwtSigningKey(privateKeyPem),
+        algorithm: JWSAlgorithm = JWSAlgorithm.RS256,
+        changeClaims: JWTClaimsSet.Builder.() -> Unit = {},
+    ): String {
+        val access = SignedJWT.parse(requestTokenPair()["accessToken"] as String)
+        val header = JWSHeader.Builder(algorithm).keyID(access.header.keyID).build()
+        return SignedJWT(header, JWTClaimsSet.Builder(access.jwtClaimsSet).apply(changeClaims).build())
+            .apply { sign(RSASSASigner(key)) }.serialize()
     }
 
     private fun requestJwks(): List<Map<String, Any>> = http.get().uri("/.well-known/jwks.json").exchange().expectStatus().isOk
