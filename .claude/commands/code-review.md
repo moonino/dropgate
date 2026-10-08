@@ -13,7 +13,7 @@ Provide a code review for the given pull request.
 **Main agent rules:**
 - Your final message is the review and is posted to the pull request verbatim by the workflow. Every way this review can end must end with a final message whose first line is exactly `## Code review`, written in Korean. Never post the summary yourself: do not use `gh pr comment`, and do not create or update any comment other than the inline comments of step 9.
 - Run every agent in the foreground and use its returned result in the same turn. Never launch an agent in the background and never end a turn to wait for agents, because the process exits when the turn ends and the review is lost.
-- Run every step below regardless of the diff size. A small diff is not a reason to skip the review agents.
+- Run every step below regardless of the diff size. A small diff is not a reason to skip the review agents. Agent 5 of step 4 runs on every review, including a diff with no source code: for documents, skills and workflows its suggestions are about wording, structure and consistency.
 - Every subagent prompt starts with the subagent rules above, copied word for word, followed by the PR title and description.
 
 To do this, follow these steps precisely:
@@ -28,7 +28,7 @@ Note: Still review Claude generated PR's.
 
 3. Launch a claude-sonnet-5-5 agent to view the pull request and return a summary of the changes
 
-4. Launch 4 agents in parallel to independently review the changes. Each agent should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "AGENTS.md or CONTRIBUTING.md adherence", "bug"). The agents should do the following:
+4. Launch 5 agents in parallel to independently review the changes. Agents 1 to 4 return issues; agent 5 returns suggestions, which are not issues. Agents 1 to 4 should return the list of issues, where each issue includes a description and the reason it was flagged (e.g. "AGENTS.md or CONTRIBUTING.md adherence", "bug"). The agents should do the following:
 
    Agents 1 + 2: rule compliance claude-opus-5-5 agents
    Audit changes for AGENTS.md and CONTRIBUTING.md compliance in parallel. Note: When evaluating compliance for a file, you should only consider rule files that share a file path with the file or parents. CONTRIBUTING.md applies to every file.
@@ -39,7 +39,10 @@ Note: Still review Claude generated PR's.
    Agent 4: claude-opus-5-5 bug agent (parallel subagent with agent 3)
    Look for problems that exist in the introduced code. This could be security issues, incorrect logic, etc. Only look for issues that fall within the changed code.
 
-   **CRITICAL: We only want HIGH SIGNAL issues.** Flag issues where:
+   Agent 5: claude-opus-5-5 suggestion agent (parallel subagent with agents 3 and 4). Launch it on every review, also when the diff has no source code.
+   Read the full diff and return at most 3 suggestions about readability or design in the introduced changes. Look for: the same condition checked twice, a name that hides the role of a thing, a DTO or helper used outside its role, a test that checks several concepts, a function that does two things. Each suggestion names the file and line, says in one or two sentences what to change and why, and must be fixable in under ten minutes. Return only suggestions you are confident a senior engineer would make in a review. If nothing is worth saying, return an empty list.
+
+   **CRITICAL: Agents 1 to 4 only want HIGH SIGNAL issues.** Flag issues where:
    - The code will fail to compile or parse (syntax errors, type errors, missing imports, unresolved references)
    - The code will definitely produce wrong results regardless of inputs (clear logic errors)
    - Clear, unambiguous AGENTS.md or CONTRIBUTING.md violations where you can quote the exact rule being broken
@@ -60,6 +63,7 @@ Note: Still review Claude generated PR's.
 7. Summarize the review findings:
    - If issues were found, list each issue with a brief description.
    - If no issues were found, state: "No issues found. Checked for bugs and AGENTS.md or CONTRIBUTING.md compliance."
+   - Keep the suggestions from agent 5 separate from the issues. They skip step 5, never become inline comments, never block the review, and are listed only in the final message of step 10.
 
    If `--comment` argument was NOT provided, or NO issues were found, skip to step 10. Do not post any inline comments.
 
@@ -75,7 +79,7 @@ Note: Still review Claude generated PR's.
 
    **IMPORTANT: Only post ONE comment per unique issue. Do not post duplicate comments.**
 
-10. End with the final message in the format below. The first line is exactly `## Code review`. If issues were found, list one line per issue with its file, a brief description, and whether an inline comment was posted. If no issues were found, use the no-issues sentence. Write the message in Korean.
+10. End with the final message in the format below. The first line is exactly `## Code review`. If issues were found, list one line per issue with its file, a brief description, and whether an inline comment was posted. If no issues were found, use the no-issues sentence. If agent 5 returned suggestions, add a `### 제안` heading after the issues and list one line per suggestion with its file, line and the change. Omit the heading when there are no suggestions. Write the message in Korean.
 
 Use this list when evaluating issues in Steps 4 and 5 (these are false positives, do NOT flag):
 
@@ -98,6 +102,10 @@ Notes:
 ## Code review
 
 발견한 문제가 없습니다. 버그와 AGENTS.md, CONTRIBUTING.md 준수 여부를 확인했습니다.
+
+### 제안
+
+- `<파일 경로>` <행>행: <무엇을 왜 바꾸는지 한두 문장>
 
 ---
 
