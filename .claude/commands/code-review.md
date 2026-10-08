@@ -13,7 +13,7 @@ Provide a code review for the given pull request.
 **Main agent rules:**
 - Your final message is the review and is posted to the pull request verbatim by the workflow. Every way this review can end must end with a final message whose first line is exactly `## Code review`, written in Korean. Never post the summary yourself: do not use `gh pr comment`, and do not create or update any comment other than the inline comments of step 9.
 - Run every agent in the foreground and use its returned result in the same turn. Never launch an agent in the background and never end a turn to wait for agents, because the process exits when the turn ends and the review is lost.
-- Run every step below regardless of the diff size. A small diff is not a reason to skip the review agents.
+- Run every step below regardless of the diff size. A small diff is not a reason to skip the review agents. Agent 5 of step 4 runs on every review, including a diff with no source code: for documents, skills and workflows its suggestions are about wording, structure and consistency.
 - Every subagent prompt starts with the subagent rules above, copied word for word, followed by the PR title and description.
 
 To do this, follow these steps precisely:
@@ -39,8 +39,8 @@ Note: Still review Claude generated PR's.
    Agent 4: claude-opus-5-5 bug agent (parallel subagent with agent 3)
    Look for problems that exist in the introduced code. This could be security issues, incorrect logic, etc. Only look for issues that fall within the changed code.
 
-   Agent 5: claude-opus-5-5 suggestion agent (parallel subagent with agents 3 and 4)
-   Read the full diff and return at most 3 suggestions about readability or design in the introduced code. Look for: the same condition checked twice, a name that hides the role of a thing, a DTO or helper used outside its role, a test that checks several concepts, a function that does two things. Each suggestion names the file and line, says in one or two sentences what to change and why, and must be fixable in under ten minutes. Return only suggestions you are confident a senior engineer would make in a review. If nothing is worth saying, return an empty list. Suggestions skip step 5, never become inline comments, and never block the review.
+   Agent 5: claude-opus-5-5 suggestion agent (parallel subagent with agents 3 and 4). Launch it on every review, also when the diff has no source code.
+   Read the full diff and return at most 3 suggestions about readability or design in the introduced changes. Look for: the same condition checked twice, a name that hides the role of a thing, a DTO or helper used outside its role, a test that checks several concepts, a function that does two things. Each suggestion names the file and line, says in one or two sentences what to change and why, and must be fixable in under ten minutes. Return only suggestions you are confident a senior engineer would make in a review. If nothing is worth saying, return an empty list. Suggestions skip step 5, never become inline comments, and never block the review.
 
    **CRITICAL: Agents 1 to 4 only want HIGH SIGNAL issues.** Flag issues where:
    - The code will fail to compile or parse (syntax errors, type errors, missing imports, unresolved references)
