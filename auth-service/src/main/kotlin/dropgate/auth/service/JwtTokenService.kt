@@ -18,7 +18,7 @@ import java.util.UUID
 
 private val ACCESS_TOKEN_TTL = Duration.ofMinutes(15)
 private val REFRESH_TOKEN_TTL = Duration.ofDays(14)
-private const val ISSUER = "dropgate-auth"
+internal const val ISSUER = "dropgate-auth"
 
 @Service
 class JwtTokenService(key: RSAKey, private val identifiers: UuidV7Generator, private val clock: Clock) {

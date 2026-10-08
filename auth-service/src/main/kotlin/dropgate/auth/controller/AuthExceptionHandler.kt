@@ -2,6 +2,7 @@ package dropgate.auth.controller
 
 import dropgate.auth.client.KakaoUnavailableException
 import dropgate.auth.repository.InvalidStateException
+import dropgate.auth.service.UnauthenticatedException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MissingServletRequestParameterException
@@ -10,6 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class AuthExceptionHandler {
+    @ExceptionHandler(UnauthenticatedException::class)
+    fun handleAuthentication(): ResponseEntity<ErrorResponse> = ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ErrorResponse("UNAUTHENTICATED", "로그인이 필요합니다"))
+
     @ExceptionHandler(InvalidStateException::class)
     fun handleState(exception: InvalidStateException): ResponseEntity<ErrorResponse> = createValidationResponse(
         field = "state",
