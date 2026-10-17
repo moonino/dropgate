@@ -1,12 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Drop, FieldError } from "@/api/types";
 import { parseDropForm, type DropFormFields } from "@/domain/drop-form";
 import { callBackend } from "@/server/backend";
 import { BackendError } from "@/server/backend-error";
-import { clearSession, readSession } from "@/server/session";
+import { requireAccessToken, signOutAndRedirect } from "@/server/request-session";
 
 export type DropFormState =
   | { kind: "idle" }
@@ -15,9 +14,7 @@ export type DropFormState =
 const INVALID_FORM_MESSAGE = "입력값을 확인해 주세요.";
 
 export async function createDropAction(_previous: DropFormState, form: FormData): Promise<DropFormState> {
-  const cookieStore = await cookies();
-  const session = readSession(cookieStore);
-  if (session.kind === "anonymous") redirect("/login");
+  const accessToken = await requireAccessToken();
   const values: DropFormFields = {
     name: String(form.get("name") ?? ""),
     totalQuantity: String(form.get("totalQuantity") ?? ""),
@@ -29,13 +26,10 @@ export async function createDropAction(_previous: DropFormState, form: FormData)
   if (parsed.kind === "invalid") return { kind: "rejected", message: INVALID_FORM_MESSAGE, fieldErrors: parsed.fieldErrors, retryAfterSeconds: undefined, values };
   let drop: Drop;
   try {
-    drop = await callBackend<Drop>("order", "/api/admin/drops", { method: "POST", body: parsed.request, accessToken: session.accessToken });
+    drop = await callBackend<Drop>("order", "/api/admin/drops", { method: "POST", body: parsed.request, accessToken });
   } catch (error) {
     if (!(error instanceof BackendError)) throw error;
-    if (error.status === 401) {
-      clearSession(cookieStore);
-      redirect("/login");
-    }
+    if (error.status === 401) await signOutAndRedirect();
     return { kind: "rejected", message: error.message, fieldErrors: error.fieldErrors, retryAfterSeconds: error.retryAfterSeconds, values };
   }
   redirect(`/drops/${drop.id}`);

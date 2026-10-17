@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Order, OrderPage } from "@/api/types";
-import { decideCancelControl, type CancelOutcome } from "@/domain/cancel";
+import { decideCancelControl, type CancelOutcome, type CancelRejection } from "@/domain/cancel";
 import { appendRetryAfter } from "@/domain/retry";
 import { ORDER_STATUS_BADGES } from "@/domain/status";
 import { formatKstStamp } from "@/domain/time";
@@ -18,7 +18,7 @@ type OrderListProps = {
 export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
   const [orders, setOrders] = useState<Order[]>(firstPage.items);
   const [nextCursor, setNextCursor] = useState<string | null>(firstPage.nextCursor);
-  const [rejections, setRejections] = useState<Record<string, CancelOutcome>>({});
+  const [rejections, setRejections] = useState<Record<string, CancelRejection>>({});
   const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -68,7 +68,7 @@ export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
   );
 }
 
-type OrderRowProps = { order: Order; rejection: CancelOutcome | undefined; pending: boolean; onCancel: (orderId: string) => void };
+type OrderRowProps = { order: Order; rejection: CancelRejection | undefined; pending: boolean; onCancel: (orderId: string) => void };
 
 function OrderRow({ order, rejection, pending, onCancel }: OrderRowProps) {
   const control = decideCancelControl(order, rejection);
