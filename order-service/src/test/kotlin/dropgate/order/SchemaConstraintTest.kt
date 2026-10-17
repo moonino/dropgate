@@ -158,12 +158,18 @@ class SchemaConstraintTest {
     }
 
     @Test
-    fun `허용되지 않은 드롭 상태 전이는 거절한다`() {
+    fun `SCHEDULED 드롭은 SOLD_OUT으로 바로 갈 수 없다`() {
         val dropId = insertDrop()
 
         assertThatThrownBy { changeDropStatus(dropId, "SOLD_OUT") }.hasMessageContaining(FORBIDDEN_DROP_TRANSITION)
+    }
+
+    @Test
+    fun `CLOSED 드롭은 OPEN으로 되돌릴 수 없다`() {
+        val dropId = insertDrop()
         changeDropStatus(dropId, "OPEN")
         changeDropStatus(dropId, "CLOSED")
+
         assertThatThrownBy { changeDropStatus(dropId, "OPEN") }.hasMessageContaining(FORBIDDEN_DROP_TRANSITION)
     }
 
