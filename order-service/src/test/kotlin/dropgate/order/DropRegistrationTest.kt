@@ -91,6 +91,13 @@ class DropRegistrationTest : DropApiIntegrationTest() {
     }
 
     @Test
+    fun `USER 토큰이면 본문이 잘못돼도 검증보다 먼저 403 FORBIDDEN을 돌려준다`() {
+        postDrop("{}", tokens.issueAccessToken(role = "USER"))
+            .expectStatus().isForbidden
+            .expectBody().jsonPath("$.code").isEqualTo("FORBIDDEN")
+    }
+
+    @Test
     fun `토큰 없이 등록하면 401 UNAUTHENTICATED를 돌려준다`() {
         http.post().uri("/api/admin/drops").contentType(MediaType.APPLICATION_JSON).body(VALID_BODY).exchange()
             .expectStatus().isUnauthorized
