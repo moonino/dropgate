@@ -10,4 +10,5 @@ dependencies {
     testImplementation(libs.spring.boot.starter.webmvc.test)
     testImplementation(libs.spring.boot.starter.validation)
     testImplementation(libs.jackson.module.kotlin)
+    testImplementation(libs.wiremock)
 }
