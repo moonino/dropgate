@@ -158,6 +158,15 @@ class SchemaConstraintTest {
     }
 
     @Test
+    fun `취소로 재고가 돌아온 SOLD_OUT 드롭은 OPEN으로 되돌릴 수 있다`() {
+        val dropId = insertDrop()
+        changeDropStatus(dropId, "OPEN")
+        changeDropStatus(dropId, "SOLD_OUT")
+
+        assertThatCode { changeDropStatus(dropId, "OPEN") }.doesNotThrowAnyException()
+    }
+
+    @Test
     fun `SCHEDULED 드롭은 SOLD_OUT으로 바로 갈 수 없다`() {
         val dropId = insertDrop()
 
