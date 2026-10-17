@@ -22,7 +22,7 @@ import java.util.UUID
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @AutoConfigureRestTestClient
-@Import(OrderAuthenticationTest.AuthenticationProbeController::class)
+@Import(PostgresTestcontainersConfiguration::class, OrderAuthenticationTest.AuthenticationProbeController::class)
 class OrderAuthenticationTest @Autowired constructor(private val http: RestTestClient) {
     @Test
     fun `토큰 없이 Bearer 엔드포인트를 부르면 401 UNAUTHENTICATED를 돌려준다`() {
