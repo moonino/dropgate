@@ -3,6 +3,7 @@ package dropgate.order.controller
 import dropgate.common.authentication.AuthenticatedUser
 import dropgate.order.service.DropResponse
 import dropgate.order.service.DropService
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -12,7 +13,7 @@ import java.net.URI
 @RestController
 class DropController(private val drops: DropService) {
     @PostMapping("/api/admin/drops")
-    fun createDrop(admin: AuthenticatedUser, @RequestBody request: CreateDropRequest): ResponseEntity<DropResponse> {
+    fun createDrop(admin: AuthenticatedUser, @RequestBody @Valid request: CreateDropRequest): ResponseEntity<DropResponse> {
         val drop = drops.createDrop(request.toCommand(), admin.id)
         return ResponseEntity.created(URI.create("/api/drops/${drop.id}")).body(drop)
     }

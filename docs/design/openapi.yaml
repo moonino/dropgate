@@ -68,10 +68,10 @@ components:
       type: object
       required: [name, totalQuantity, openAt, closeAt]
       properties:
-        name: { type: string, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 100, description: 공백만으로 된 이름은 거절 }
         totalQuantity: { type: integer, minimum: 1 }
-        openAt: { type: string, format: date-time }
-        closeAt: { type: string, format: date-time }
+        openAt: { type: string, format: date-time, description: "밀리초 아래는 버린다. 0001-01-01T00:00:00Z 이상 10000-01-01T00:00:00Z 미만이어야 한다. 아니면 400, errors의 field는 openAt" }
+        closeAt: { type: string, format: date-time, description: "openAt보다 늦어야 하고 0001-01-01T00:00:00Z 이상 10000-01-01T00:00:00Z 미만이어야 한다. 아니면 400, errors의 field는 closeAt. 다른 필드 오류와 같은 errors에 함께 담는다" }
         admissionRatePerSec: { type: integer, minimum: 1, maximum: 10000, default: 50 }
     Drop:
       type: object
