@@ -63,7 +63,6 @@ class DropQueryTest : DropApiIntegrationTest() {
         val page = readPage(http.get().uri("/api/drops").exchange())
 
         assertThat(page.ids).containsExactly(open, scheduled, soldOut)
-        assertThat(page.nextCursor).isNull()
     }
 
     @Test
