@@ -270,12 +270,14 @@ paths:
     get:
       tags: [drops]
       summary: 드롭 목록(SCHEDULED, OPEN, SOLD_OUT), openAt 순, 커서 페이징
+      description: openAt이 같으면 id 순이다. cursor는 앞 페이지의 nextCursor를 그대로 넘기는 불투명 문자열이다. 읽을 수 없거나 저장할 수 없는 시각을 담은 cursor는 400이고 errors의 field는 cursor다.
       security: []
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
       responses:
         '200': { description: 목록, content: { application/json: { schema: { $ref: '#/components/schemas/DropPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /api/drops/{dropId}:
     get:
       tags: [drops]
