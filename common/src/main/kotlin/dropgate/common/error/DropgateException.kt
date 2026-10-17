@@ -3,6 +3,6 @@ package dropgate.common.error
 class DropgateException(
     val errorCode: ErrorCode,
     reason: String,
-    val errors: List<FieldErrorResponse> = emptyList(),
+    val errors: List<InvalidField> = emptyList(),
     cause: Throwable? = null,
 ) : RuntimeException(reason, cause)

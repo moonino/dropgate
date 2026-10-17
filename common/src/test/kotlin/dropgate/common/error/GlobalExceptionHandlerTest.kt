@@ -18,7 +18,6 @@ class GlobalExceptionHandlerTest {
             jsonPath("$.code") { value("FORBIDDEN") }
             jsonPath("$.message") { value(ErrorCode.FORBIDDEN.message) }
             jsonPath("$.errors") { isEmpty() }
-            header { doesNotExist(HttpHeaders.RETRY_AFTER) }
         }
     }
 
@@ -27,6 +26,13 @@ class GlobalExceptionHandlerTest {
         mvc.get("/failures/STOCK_UNAVAILABLE").andExpect {
             status { isServiceUnavailable() }
             header { string(HttpHeaders.RETRY_AFTER, "2") }
+        }
+    }
+
+    @Test
+    fun `503이 아닌 오류 응답에는 Retry-After를 붙이지 않는다`() {
+        mvc.get("/failures/FORBIDDEN").andExpect {
+            header { doesNotExist(HttpHeaders.RETRY_AFTER) }
         }
     }
 
@@ -44,6 +50,6 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/failures/{code}")
         fun fail(@PathVariable("code") code: ErrorCode): Unit = throw DropgateException(code, "테스트 실패", fieldErrorsOf(code))
 
-        private fun fieldErrorsOf(code: ErrorCode) = if (code == ErrorCode.VALIDATION_FAILED) listOf(FieldErrorResponse("name", "이름은 100자 이하여야 합니다")) else emptyList()
+        private fun fieldErrorsOf(code: ErrorCode) = if (code == ErrorCode.VALIDATION_FAILED) listOf(InvalidField("name", "이름은 100자 이하여야 합니다")) else emptyList()
     }
 }

@@ -8,4 +8,4 @@ data class FieldErrorResponse(val field: String, val message: String)
 
 fun DropgateException.toResponseEntity(): ResponseEntity<ErrorResponse> = ResponseEntity.status(errorCode.status)
     .headers(errorCode.createHeaders())
-    .body(ErrorResponse(errorCode.name, errorCode.message, errors))
+    .body(ErrorResponse(errorCode.name, errorCode.message, errors.map { FieldErrorResponse(it.field, it.message) }))
