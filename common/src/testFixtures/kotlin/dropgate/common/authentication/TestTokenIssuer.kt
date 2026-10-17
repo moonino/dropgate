@@ -15,7 +15,6 @@ import java.util.UUID
 
 private const val RSA_KEY_BITS = 2048
 private const val TEST_ISSUER = "dropgate-auth"
-private val ACCESS_TOKEN_TTL = Duration.ofMinutes(15)
 
 class TestTokenIssuer(private val clock: Clock, keyId: String = "test-key") {
     private val key = RSAKeyGenerator(RSA_KEY_BITS).keyUse(KeyUse.SIGNATURE).algorithm(JWSAlgorithm.RS256).keyID(keyId).generate()
@@ -40,5 +39,9 @@ class TestTokenIssuer(private val clock: Clock, keyId: String = "test-key") {
             .build()
         val header = JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.keyID).build()
         return SignedJWT(header, claims).apply { sign(RSASSASigner(key)) }.serialize()
+    }
+
+    companion object {
+        val ACCESS_TOKEN_TTL: Duration = Duration.ofMinutes(15)
     }
 }

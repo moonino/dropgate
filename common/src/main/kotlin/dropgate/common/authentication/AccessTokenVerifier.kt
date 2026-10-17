@@ -22,7 +22,9 @@ class AccessTokenVerifier(private val jwkSetCache: JwkSetCache, private val cloc
     fun verify(token: String): AuthenticatedUser {
         val jwt = parse(token)
         verifySignature(jwt)
-        return readUser(readClaims(jwt))
+        val claims = readClaims(jwt)
+        verifyClaims(claims)
+        return readUser(claims)
     }
 
     private fun parse(token: String): SignedJWT = try {
@@ -42,7 +44,7 @@ class AccessTokenVerifier(private val jwkSetCache: JwkSetCache, private val cloc
     }
 
     private fun findPublicKey(header: JWSHeader): RSAKey {
-        val key = jwkSetCache.currentKeys().getKeyByKeyId(header.keyID) ?: throw unauthenticated("JWKS에 kid ${header.keyID} 키가 없습니다")
+        val key = jwkSetCache.getCurrentKeys().getKeyByKeyId(header.keyID) ?: throw unauthenticated("JWKS에 kid ${header.keyID} 키가 없습니다")
         return key as? RSAKey ?: throw unauthenticated("kid ${header.keyID} 키가 RSA 키가 아닙니다")
     }
 
@@ -52,13 +54,14 @@ class AccessTokenVerifier(private val jwkSetCache: JwkSetCache, private val cloc
         throw unauthenticated("토큰 클레임을 읽을 수 없습니다", exception)
     }
 
-    private fun readUser(claims: JWTClaimsSet): AuthenticatedUser {
+    private fun verifyClaims(claims: JWTClaimsSet) {
         if (claims.issuer != ACCESS_TOKEN_ISSUER) throw unauthenticated("발급자 iss가 $ACCESS_TOKEN_ISSUER 가 아닙니다: ${claims.issuer}")
         val expiresAt = claims.expirationTime?.toInstant() ?: throw unauthenticated("토큰에 만료 시각 exp가 없습니다")
         if (!clock.instant().isBefore(expiresAt)) throw unauthenticated("토큰의 만료 시각 exp가 지났습니다: $expiresAt")
         if (claims.getClaim(TOKEN_TYPE_CLAIM) == REFRESH_TOKEN_TYPE) throw unauthenticated("리프레시 토큰은 액세스 토큰으로 쓸 수 없습니다")
-        return AuthenticatedUser(readUserId(claims.subject), readRole(claims.getClaim(ROLE_CLAIM)))
     }
+
+    private fun readUser(claims: JWTClaimsSet): AuthenticatedUser = AuthenticatedUser(readUserId(claims.subject), readRole(claims.getClaim(ROLE_CLAIM)))
 
     private fun readUserId(subject: String?): UUID {
         val userId = subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }

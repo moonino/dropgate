@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
-import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -45,7 +44,7 @@ class AccessTokenVerifierTest {
     @Test
     fun `만료 직전까지는 토큰을 받아들인다`() {
         val token = issuer.issueAccessToken()
-        clock.advance(Duration.ofMinutes(15).minusNanos(1))
+        clock.advance(TestTokenIssuer.ACCESS_TOKEN_TTL.minusNanos(1))
         assertThat(verifier.verify(token).role).isEqualTo(Role.USER)
     }
 
@@ -53,7 +52,7 @@ class AccessTokenVerifierTest {
     @ValueSource(longs = [0, 1])
     fun `만료 시각부터 토큰을 거부한다`(secondsAfterExpiry: Long) {
         val token = issuer.issueAccessToken()
-        clock.advance(Duration.ofMinutes(15).plusSeconds(secondsAfterExpiry))
+        clock.advance(TestTokenIssuer.ACCESS_TOKEN_TTL.plusSeconds(secondsAfterExpiry))
         assertUnauthenticated(token).hasMessageContaining("exp")
     }
 
