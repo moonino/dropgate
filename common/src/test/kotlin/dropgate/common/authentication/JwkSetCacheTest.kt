@@ -18,22 +18,22 @@ class JwkSetCacheTest {
 
     @Test
     fun `받은 JWKS의 키를 돌려준다`() {
-        assertThat(cache.currentKeys().getKeyByKeyId("test-key")).isNotNull()
+        assertThat(cache.getCurrentKeys().getKeyByKeyId("test-key")).isNotNull()
     }
 
     @Test
     fun `10분 안에는 JWKS를 다시 받지 않는다`() {
-        cache.currentKeys()
+        cache.getCurrentKeys()
         clock.advance(JWKS_CACHE_TTL.minusNanos(1))
-        cache.currentKeys()
+        cache.getCurrentKeys()
         assertThat(fetcher.fetchCount).isEqualTo(1)
     }
 
     @Test
     fun `10분이 지나면 JWKS를 다시 받는다`() {
-        cache.currentKeys()
+        cache.getCurrentKeys()
         clock.advance(JWKS_CACHE_TTL)
-        cache.currentKeys()
+        cache.getCurrentKeys()
         assertThat(fetcher.fetchCount).isEqualTo(2)
     }
 
@@ -45,7 +45,7 @@ class JwkSetCacheTest {
     @Test
     fun `10분 뒤 다시 받지 못하면 만료된 키를 쓰지 않고 AUTH_UNAVAILABLE로 거부한다`() {
         val failingAfterFirst = JwkSetCache(CountingJwkSetFetcher { attempt -> if (attempt == 1) JWK_SET_JSON else throw createFetchFailure() }, clock)
-        failingAfterFirst.currentKeys()
+        failingAfterFirst.getCurrentKeys()
         clock.advance(JWKS_CACHE_TTL)
         assertAuthUnavailable(failingAfterFirst)
     }
@@ -55,11 +55,11 @@ class JwkSetCacheTest {
         val recovering = CountingJwkSetFetcher { attempt -> if (attempt == 1) throw createFetchFailure() else JWK_SET_JSON }
         val recoveringCache = JwkSetCache(recovering, clock)
         assertAuthUnavailable(recoveringCache)
-        assertThat(recoveringCache.currentKeys().getKeyByKeyId("test-key")).isNotNull()
+        assertThat(recoveringCache.getCurrentKeys().getKeyByKeyId("test-key")).isNotNull()
     }
 
     private fun assertAuthUnavailable(target: JwkSetCache) {
-        val exception = assertThrows<DropgateException> { target.currentKeys() }
+        val exception = assertThrows<DropgateException> { target.getCurrentKeys() }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE)
     }
 

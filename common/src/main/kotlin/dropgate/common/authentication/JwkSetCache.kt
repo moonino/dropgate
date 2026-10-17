@@ -12,17 +12,17 @@ private val JWKS_CACHE_TTL = Duration.ofMinutes(10)
 
 class JwkSetCache(private val fetcher: JwkSetFetcher, private val clock: Clock) {
     @Volatile
-    private var latest: FetchOutcome = FetchedKeys(JWKSet(), Instant.MIN)
+    private var latest: FetchOutcome = NotFetched
 
-    internal fun currentKeys(): JWKSet {
+    internal fun getCurrentKeys(): JWKSet {
         val observed = latest
-        return if (observed.isFreshAt(clock.instant())) observed.keys() else refreshOrShare(observed)
+        return if (observed.isFreshAt(clock.instant())) observed.resolveKeys() else refreshOrShare(observed)
     }
 
     @Synchronized
     private fun refreshOrShare(observed: FetchOutcome): JWKSet {
         if (latest === observed) latest = fetch()
-        return latest.keys()
+        return latest.resolveKeys()
     }
 
     private fun fetch(): FetchOutcome {
@@ -43,18 +43,24 @@ class JwkSetCache(private val fetcher: JwkSetFetcher, private val clock: Clock) 
     private sealed interface FetchOutcome {
         fun isFreshAt(now: Instant): Boolean
 
-        fun keys(): JWKSet
+        fun resolveKeys(): JWKSet
+    }
+
+    private data object NotFetched : FetchOutcome {
+        override fun isFreshAt(now: Instant): Boolean = false
+
+        override fun resolveKeys(): JWKSet = throw IllegalStateException("JWKS를 아직 받지 않았습니다")
     }
 
     private class FetchedKeys(private val keys: JWKSet, private val expiresAt: Instant) : FetchOutcome {
         override fun isFreshAt(now: Instant): Boolean = now.isBefore(expiresAt)
 
-        override fun keys(): JWKSet = keys
+        override fun resolveKeys(): JWKSet = keys
     }
 
     private class FetchFailure(private val failure: DropgateException) : FetchOutcome {
         override fun isFreshAt(now: Instant): Boolean = false
 
-        override fun keys(): JWKSet = throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "JWKS 조회가 실패했습니다: ${failure.message}", cause = failure)
+        override fun resolveKeys(): JWKSet = throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "JWKS 조회가 실패했습니다: ${failure.message}", cause = failure)
     }
 }

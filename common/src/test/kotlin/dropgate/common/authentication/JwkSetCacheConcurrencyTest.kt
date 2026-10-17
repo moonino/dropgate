@@ -46,7 +46,7 @@ class JwkSetCacheConcurrencyTest {
 
     private class KeyRequest(cache: JwkSetCache) {
         private var outcome: Result<JWKSet> = Result.failure(IllegalStateException("키 요청이 ${WAIT_LIMIT.seconds}초 안에 끝나지 않았습니다"))
-        private val thread = Thread { outcome = runCatching { cache.currentKeys() } }.apply { start() }
+        private val thread = Thread { outcome = runCatching { cache.getCurrentKeys() } }.apply { start() }
 
         fun awaitBlocked() {
             val deadline = System.nanoTime() + WAIT_LIMIT.toNanos()
