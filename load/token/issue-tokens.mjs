@@ -37,7 +37,7 @@ const issueAccessToken = (role, issuedAtSeconds) => {
 const requestsOfUser = (userIndex) =>
   userIndex % REPEATING_USER_INTERVAL === 0 ? REQUESTS_PER_REPEATING_USER : 1;
 
-const issuePurchaseRequestTokens = (issuedAtSeconds) => {
+const issuePurchaseRequestTokens = (requestCount, issuedAtSeconds) => {
   const requestTokens = [];
   let userCount = 0;
   let fullyRepeatingUserCount = 0;
@@ -55,7 +55,10 @@ const issuePurchaseRequestTokens = (issuedAtSeconds) => {
 
 const issuedAtSeconds = Math.floor(Date.now() / 1000);
 const jwkSet = { keys: [{ ...publicKey.export({ format: 'jwk' }), use: 'sig', alg: 'RS256', kid: KEY_ID }] };
-const { requestTokens, userCount, fullyRepeatingUserCount } = issuePurchaseRequestTokens(issuedAtSeconds);
+const { requestTokens, userCount, fullyRepeatingUserCount } = issuePurchaseRequestTokens(
+  requestCount,
+  issuedAtSeconds,
+);
 
 mkdirSync(outputDir, { recursive: true });
 writeFileSync(join(outputDir, 'jwks.json'), JSON.stringify(jwkSet));
