@@ -116,7 +116,7 @@ class SchemaConstraintTest {
 
     @Test
     fun `outbox 상태는 PENDING과 PUBLISHED와 FAILED만 허용한다`() {
-        assertThatThrownBy { insertOutboxEvent(status = "SENT") }
+        assertThatThrownBy { insertOutboxEventWithStatus("SENT") }
             .isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
@@ -134,15 +134,21 @@ class SchemaConstraintTest {
 
     @Test
     fun `설계한 인덱스가 이름 그대로 있다`() {
-        val indexes =
-            jdbc.sql("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'orders'")
-                .query { rs, _ -> rs.getString("indexname") to rs.getString("indexdef") }
-                .list()
-                .toMap()
-
-        assertThat(indexes).containsKeys(*DESIGNED_INDEXES)
-        assertThat(indexes["outbox_pending_idx"]).contains("WHERE")
+        assertThat(ordersIndexDefinitions()).containsKeys(*DESIGNED_INDEXES)
     }
+
+    @Test
+    fun `outbox 대기 인덱스는 PENDING 행만 담는 부분 인덱스다`() {
+        assertThat(ordersIndexDefinitions()["outbox_pending_idx"])
+            .contains("WHERE")
+            .contains("status")
+            .contains("'PENDING'")
+    }
+
+    private fun ordersIndexDefinitions(): Map<String, String> = jdbc.sql("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'orders'")
+        .query { rs, _ -> rs.getString("indexname") to rs.getString("indexdef") }
+        .list()
+        .toMap()
 
     private fun insertDrop(
         totalQuantity: Int = 10,
@@ -238,15 +244,24 @@ class SchemaConstraintTest {
         .query(Long::class.java)
         .single()
 
-    private fun insertOutboxEvent(status: String = "PENDING"): Long = jdbc.sql(
+    private fun insertOutboxEvent(): Long = jdbc.sql(
         """
-            INSERT INTO orders.outbox (aggregate_type, aggregate_id, event_type, payload, status)
-            VALUES ('order', gen_random_uuid(), 'order.confirmed', '{}'::jsonb, :status)
+            INSERT INTO orders.outbox (aggregate_type, aggregate_id, event_type, payload)
+            VALUES ('order', gen_random_uuid(), 'order.confirmed', '{}'::jsonb)
             RETURNING id
             """,
-    ).param("status", status)
-        .query(Long::class.java)
+    ).query(Long::class.java)
         .single()
+
+    private fun insertOutboxEventWithStatus(status: String) {
+        jdbc.sql(
+            """
+            INSERT INTO orders.outbox (aggregate_type, aggregate_id, event_type, payload, status)
+            VALUES ('order', gen_random_uuid(), 'order.confirmed', '{}'::jsonb, :status)
+            """,
+        ).param("status", status)
+            .update()
+    }
 
     companion object {
         private val OPEN_AT = OffsetDateTime.parse("2026-11-01T10:00:00Z")
