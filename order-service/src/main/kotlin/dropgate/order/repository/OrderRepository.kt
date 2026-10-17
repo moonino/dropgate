@@ -32,4 +32,26 @@ interface OrderRepository : JpaRepository<OrderEntity, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM OrderEntity o WHERE o.id = :id")
     fun findForUpdate(@Param("id") id: UUID): Optional<OrderEntity>
+
+    @Query(
+        value = """
+        SELECT * FROM orders.orders
+        WHERE user_id = :userId
+        ORDER BY confirmed_at DESC, id DESC
+        LIMIT :limit
+    """,
+        nativeQuery = true,
+    )
+    fun findLatestByUser(@Param("userId") userId: UUID, @Param("limit") limit: Int): List<OrderEntity>
+
+    @Query(
+        value = """
+        SELECT * FROM orders.orders
+        WHERE user_id = :userId AND (confirmed_at, id) < (:confirmedAt, :id)
+        ORDER BY confirmed_at DESC, id DESC
+        LIMIT :limit
+    """,
+        nativeQuery = true,
+    )
+    fun findLatestByUserBefore(@Param("userId") userId: UUID, @Param("confirmedAt") confirmedAt: Instant, @Param("id") id: UUID, @Param("limit") limit: Int): List<OrderEntity>
 }
