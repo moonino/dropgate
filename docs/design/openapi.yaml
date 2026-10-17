@@ -330,7 +330,7 @@ paths:
     post:
       tags: [orders]
       summary: 구매. 입장 상태여야 하고 1인 1개
-      description: 1주 차 DB만 경로(ADR 0005)는 입장 확인을 건너뛰고, 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다.
+      description: 1주 차 DB만 경로(ADR 0005)는 입장 확인을 건너뛰고, 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다. 마지막 재고를 팔면 드롭은 SOLD_OUT이 된다.
       security: [ { bearer: [] } ]
       parameters:
         - { name: dropId, in: path, required: true, schema: { type: string, format: uuid } }
