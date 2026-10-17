@@ -102,6 +102,48 @@ class SchemaConstraintTest {
             .isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
+    @Test
+    fun `원장 항목 종류는 CONFIRMED와 CANCELED만 허용한다`() {
+        assertThatThrownBy { insertLedgerEntry(entryType = "REFUNDED") }
+            .isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `없는 주문으로 원장 항목을 넣을 수 없다`() {
+        assertThatThrownBy { insertLedgerEntry(orderId = UUID.randomUUID(), dropId = UUID.randomUUID(), userId = UUID.randomUUID()) }
+            .isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `outbox 상태는 PENDING과 PUBLISHED와 FAILED만 허용한다`() {
+        assertThatThrownBy { insertOutboxEvent(status = "SENT") }
+            .isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `상태와 시도 횟수를 주지 않은 outbox 이벤트는 PENDING과 0이 된다`() {
+        val eventId = insertOutboxEvent()
+
+        val row =
+            jdbc.sql("SELECT status, attempts FROM orders.outbox WHERE id = :id")
+                .param("id", eventId)
+                .query { rs, _ -> rs.getString("status") to rs.getInt("attempts") }
+                .single()
+        assertThat(row).isEqualTo("PENDING" to 0)
+    }
+
+    @Test
+    fun `설계한 인덱스가 이름 그대로 있다`() {
+        val indexes =
+            jdbc.sql("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'orders'")
+                .query { rs, _ -> rs.getString("indexname") to rs.getString("indexdef") }
+                .list()
+                .toMap()
+
+        assertThat(indexes).containsKeys(*DESIGNED_INDEXES)
+        assertThat(indexes["outbox_pending_idx"]).contains("WHERE")
+    }
+
     private fun insertDrop(
         totalQuantity: Int = 10,
         remainingQuantity: Int = totalQuantity,
@@ -171,7 +213,51 @@ class SchemaConstraintTest {
         return id
     }
 
+    private fun insertLedgerEntry(entryType: String = "CONFIRMED"): Long {
+        val dropId = insertDrop()
+        val userId = UUID.randomUUID()
+        val orderId = insertOrder(dropId, userId)
+        return insertLedgerEntry(orderId, dropId, userId, entryType)
+    }
+
+    private fun insertLedgerEntry(
+        orderId: UUID,
+        dropId: UUID,
+        userId: UUID,
+        entryType: String = "CONFIRMED",
+    ): Long = jdbc.sql(
+        """
+            INSERT INTO orders.order_ledger (order_id, drop_id, user_id, entry_type)
+            VALUES (:orderId, :dropId, :userId, :entryType)
+            RETURNING id
+            """,
+    ).param("orderId", orderId)
+        .param("dropId", dropId)
+        .param("userId", userId)
+        .param("entryType", entryType)
+        .query(Long::class.java)
+        .single()
+
+    private fun insertOutboxEvent(status: String = "PENDING"): Long = jdbc.sql(
+        """
+            INSERT INTO orders.outbox (aggregate_type, aggregate_id, event_type, payload, status)
+            VALUES ('order', gen_random_uuid(), 'order.confirmed', '{}'::jsonb, :status)
+            RETURNING id
+            """,
+    ).param("status", status)
+        .query(Long::class.java)
+        .single()
+
     companion object {
         private val OPEN_AT = OffsetDateTime.parse("2026-11-01T10:00:00Z")
+        private val DESIGNED_INDEXES =
+            arrayOf(
+                "drops_status_open_at_idx",
+                "orders_user_confirmed_idx",
+                "orders_drop_status_idx",
+                "order_ledger_occurred_idx",
+                "order_ledger_drop_occurred_idx",
+                "outbox_pending_idx",
+            )
     }
 }
