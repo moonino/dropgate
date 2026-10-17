@@ -47,7 +47,7 @@ shared-local-instance.db
 pgdata/
 
 # load test output (measurements go to docs/measurements as tables)
-k6/results/
+**/k6/results/
 *.k6.json
 
 # Terraform, Kubernetes, Helm
