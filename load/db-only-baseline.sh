@@ -133,7 +133,7 @@ is_drop_open() {
 run_k6() {
   local drop_id="$1"
   log "k6 가상 사용자 500으로 구매 요청 ${REQUEST_COUNT}건을 보냅니다"
-  docker run --rm --name "$K6_CONTAINER" \
+  docker run --rm --name "$K6_CONTAINER" --add-host=host.docker.internal:host-gateway \
     -v "$ROOT_DIR/load/k6:/scripts:ro" -v "$WORK_DIR:/data:ro" -v "$RESULTS_DIR:/results" \
     "$K6_IMAGE" run --quiet \
     -e DROPGATE_LOAD_BASE_URL="$ORDER_URL_FROM_DOCKER" \
