@@ -17,6 +17,8 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.client.RestTestClient
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.UUID
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
@@ -46,8 +48,29 @@ abstract class DropApiIntegrationTest {
         .body(body)
         .exchange()
 
+    fun insertDrop(
+        openAt: Instant = OPEN_AT,
+        status: String = "SCHEDULED",
+        closeAt: Instant = openAt.plusSeconds(3600),
+        id: UUID = UUID.randomUUID(),
+    ): UUID {
+        jdbc.sql(
+            """
+            INSERT INTO orders.drops (id, name, total_quantity, remaining_quantity, open_at, close_at, status, created_by)
+            VALUES (:id, 'drop', 10, 10, :openAt, :closeAt, :status, :createdBy)
+            """,
+        ).param("id", id)
+            .param("openAt", openAt.atOffset(ZoneOffset.UTC))
+            .param("closeAt", closeAt.atOffset(ZoneOffset.UTC))
+            .param("status", status)
+            .param("createdBy", UUID.randomUUID())
+            .update()
+        return id
+    }
+
     companion object {
         private const val JWKS_PATH = "/.well-known/jwks.json"
+        val OPEN_AT: Instant = Instant.parse("2030-11-01T10:00:00Z")
         val tokens = TestTokenIssuer(Clock.systemUTC())
         private val jwks = WireMockServer(0).apply {
             start()

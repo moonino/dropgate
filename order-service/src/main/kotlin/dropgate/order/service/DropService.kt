@@ -1,6 +1,8 @@
 package dropgate.order.service
 
 import dropgate.common.UuidV7Generator
+import dropgate.common.error.DropgateException
+import dropgate.common.error.ErrorCode
 import dropgate.order.entity.DropEntity
 import dropgate.order.entity.DropStatus
 import dropgate.order.repository.DropRepository
@@ -24,5 +26,11 @@ class DropService(private val drops: DropRepository, private val identifiers: Uu
             createdBy = adminId,
         )
         return DropResponse.createWithoutStock(drops.save(drop))
+    }
+
+    @Transactional(readOnly = true)
+    fun getDrop(id: UUID): DropResponse {
+        val drop = drops.findById(id).orElseThrow { DropgateException(ErrorCode.DROP_NOT_FOUND, "드롭이 없습니다: $id") }
+        return DropResponse.createWithoutStock(drop)
     }
 }

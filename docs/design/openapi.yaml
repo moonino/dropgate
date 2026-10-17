@@ -86,7 +86,7 @@ components:
         admissionRatePerSec: { type: integer }
         remainingQuantity:
           type: [integer, "null"]
-          description: Redis 재고. Redis를 읽을 수 없으면 null
+          description: Redis 재고. Redis를 읽을 수 없으면 null. 1주 차에는 Redis가 없어 항상 null(ADR 0005)
     DropPage:
       type: object
       required: [items, nextCursor]
@@ -285,6 +285,7 @@ paths:
         - { name: dropId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: 드롭, content: { application/json: { schema: { $ref: '#/components/schemas/Drop' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
   /api/drops/{dropId}/queue:
     post:
