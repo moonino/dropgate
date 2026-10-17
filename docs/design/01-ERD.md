@@ -212,7 +212,7 @@ BATCH_JOB_INSTANCE, BATCH_JOB_EXECUTION, BATCH_JOB_EXECUTION_PARAMS, BATCH_STEP_
 
 | 스키마.테이블 | 트리거 | 동작 |
 |---|---|---|
-| orders.drops | drops_guard_update | OPEN 이후 total_quantity, open_at 변경 거절. 허용되지 않은 status 전이 거절(SOLD_OUT -> OPEN은 V4부터 허용, ADR 0019). updated_at 갱신 |
+| orders.drops | drops_guard_update | OPEN 이후 total_quantity, open_at 변경 거절. 허용되지 않은 status 전이 거절. updated_at 갱신 |
 | orders.orders | orders_guard_update | CONFIRMED -> CANCELED 외 변경 거절 |
 | orders.orders | orders_forbid_delete | DELETE 거절 |
 | orders.order_ledger | ledger_immutable | UPDATE, DELETE, TRUNCATE 거절 |
