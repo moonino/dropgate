@@ -35,7 +35,7 @@ class MyOrdersTest : OrderApiIntegrationTest() {
     }
 
     @Test
-    fun `주문마다 드롭 이름과 확정 시각을 담는다`() {
+    fun `주문마다 드롭 이름과 수량과 확정 시각을 담는다`() {
         insertOrder(CONFIRMED_AT)
 
         getMyOrders().expectStatus().isOk
