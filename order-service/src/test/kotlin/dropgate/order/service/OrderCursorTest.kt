@@ -33,6 +33,7 @@ class OrderCursorTest {
         val encoded = OrderCursor(Instant.parse(confirmedAt), UUID.randomUUID()).encode()
 
         assertThatThrownBy { OrderCursor.decode(encoded) }.isInstanceOfSatisfying(DropgateException::class.java) {
+            assertThat(it.errorCode).isEqualTo(ErrorCode.VALIDATION_FAILED)
             assertThat(it.errors.map { error -> error.field }).containsExactly("cursor")
         }
     }
