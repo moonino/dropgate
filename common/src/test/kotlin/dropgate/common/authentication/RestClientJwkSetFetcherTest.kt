@@ -28,10 +28,16 @@ class RestClientJwkSetFetcherTest {
     }
 
     @Test
-    fun `JWKS 서버가 실패하면 AUTH_UNAVAILABLE 예외에 주소를 남긴다`() {
+    fun `JWKS 서버가 실패하면 AUTH_UNAVAILABLE로 거부한다`() {
         wiremock.stubFor(WireMock.get(JWKS_PATH).willReturn(WireMock.serverError()))
         val exception = assertThrows<DropgateException> { fetcher.fetch() }
         assertThat(exception.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE)
+    }
+
+    @Test
+    fun `JWKS 서버가 실패하면 예외 사유에 JWKS 주소를 남긴다`() {
+        wiremock.stubFor(WireMock.get(JWKS_PATH).willReturn(WireMock.serverError()))
+        val exception = assertThrows<DropgateException> { fetcher.fetch() }
         assertThat(exception).hasMessageContaining(JWKS_PATH)
     }
 
