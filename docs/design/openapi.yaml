@@ -358,11 +358,13 @@ paths:
     post:
       tags: [orders]
       summary: 주문 취소. 본인 주문, 드롭 마감 전, CONFIRMED만
+      description: 검사 순서는 ORDER_NOT_FOUND, FORBIDDEN(남의 주문), ORDER_ALREADY_CANCELED, DROP_CLOSED다. 취소한 재고는 되돌리고 SOLD_OUT 드롭은 OPEN으로 돌아간다(ADR 0019). 취소한 사용자는 같은 드롭을 다시 살 수 없다.
       security: [ { bearer: [] } ]
       parameters:
         - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: 취소됨, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
