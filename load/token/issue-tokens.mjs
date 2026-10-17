@@ -39,27 +39,28 @@ const requestsOfUser = (userIndex) =>
 
 const issuePurchaseRequestTokens = (issuedAtSeconds) => {
   const requestTokens = [];
+  let userCount = 0;
+  let fullyRepeatingUserCount = 0;
   for (let userIndex = 0; requestTokens.length < requestCount; userIndex += 1) {
     const userToken = issueAccessToken('USER', issuedAtSeconds);
     const repeats = Math.min(requestsOfUser(userIndex), requestCount - requestTokens.length);
     requestTokens.push(...Array(repeats).fill(userToken));
+    userCount += 1;
+    if (repeats === REQUESTS_PER_REPEATING_USER) {
+      fullyRepeatingUserCount += 1;
+    }
   }
-  return requestTokens;
+  return { requestTokens, userCount, fullyRepeatingUserCount };
 };
-
-const countRequestsPerUser = (requestTokens) =>
-  requestTokens.reduce((counts, token) => counts.set(token, (counts.get(token) ?? 0) + 1), new Map());
 
 const issuedAtSeconds = Math.floor(Date.now() / 1000);
 const jwkSet = { keys: [{ ...publicKey.export({ format: 'jwk' }), use: 'sig', alg: 'RS256', kid: KEY_ID }] };
-const requestTokens = issuePurchaseRequestTokens(issuedAtSeconds);
-const requestsPerUser = [...countRequestsPerUser(requestTokens).values()];
-const repeatingUsers = requestsPerUser.filter((requests) => requests > 1).length;
+const { requestTokens, userCount, fullyRepeatingUserCount } = issuePurchaseRequestTokens(issuedAtSeconds);
 
 mkdirSync(outputDir, { recursive: true });
 writeFileSync(join(outputDir, 'jwks.json'), JSON.stringify(jwkSet));
 writeFileSync(join(outputDir, 'purchase-request-tokens.json'), JSON.stringify(requestTokens));
 writeFileSync(join(outputDir, 'admin-token.txt'), issueAccessToken('ADMIN', issuedAtSeconds));
 console.log(
-  `구매 요청 토큰 ${requestTokens.length}개(사용자 ${requestsPerUser.length}명, 그중 ${repeatingUsers}명은 같은 토큰으로 연달아 ${REQUESTS_PER_REPEATING_USER}번)와 ADMIN 토큰 1개, JWKS를 ${outputDir} 에 썼습니다`,
+  `구매 요청 토큰 ${requestTokens.length}개(사용자 ${userCount}명, 그중 ${fullyRepeatingUserCount}명은 같은 토큰으로 연달아 ${REQUESTS_PER_REPEATING_USER}번)와 ADMIN 토큰 1개, JWKS를 ${outputDir} 에 썼습니다`,
 );
