@@ -261,7 +261,7 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: '#/components/schemas/CreateDropRequest' } } }
       responses:
-        '201': { description: 등록됨, headers: { Location: { schema: { type: string } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Drop' } } } }
+        '201': { description: 등록됨. status는 SCHEDULED, headers: { Location: { schema: { type: string }, description: "/api/drops/{dropId}" } }, content: { application/json: { schema: { $ref: '#/components/schemas/Drop' } } } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
