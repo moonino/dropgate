@@ -21,13 +21,18 @@ class JwtAuthenticationFilterTest {
     private val publicEndpoints = listOf(PublicEndpoint(HttpMethod.GET, "/api/drops/*"))
 
     @Test
-    fun `토큰이 없으면 401 UNAUTHENTICATED 오류 응답을 쓰고 요청을 멈춘다`() {
-        val chain = MockFilterChain()
-        val response = filter().run(MockHttpServletRequest("POST", "/api/drops/1/orders"), chain)
+    fun `토큰이 없으면 401 UNAUTHENTICATED 오류 응답을 쓴다`() {
+        val response = filter().run(MockHttpServletRequest("POST", "/api/drops/1/orders"), MockFilterChain())
         assertThat(response.status).isEqualTo(401)
         assertThat(response.contentType).startsWith("application/json")
         assertThat(jsonMapper.readTree(response.contentAsString))
             .isEqualTo(jsonMapper.readTree("""{"code":"UNAUTHENTICATED","message":"로그인이 필요합니다","errors":[]}"""))
+    }
+
+    @Test
+    fun `토큰이 없으면 요청을 다음 필터로 넘기지 않는다`() {
+        val chain = MockFilterChain()
+        filter().run(MockHttpServletRequest("POST", "/api/drops/1/orders"), chain)
         assertThat(chain.request).isNull()
     }
 
