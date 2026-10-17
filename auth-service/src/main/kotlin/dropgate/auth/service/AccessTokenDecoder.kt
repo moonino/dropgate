@@ -1,6 +1,8 @@
 package dropgate.auth.service
 
 import com.nimbusds.jose.jwk.RSAKey
+import dropgate.common.error.DropgateException
+import dropgate.common.error.ErrorCode
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm
 import org.springframework.security.oauth2.jwt.JwtException
@@ -30,7 +32,7 @@ class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
 
     fun decodeUserId(authorization: String): UUID {
         val token = BEARER_HEADER.matchEntire(authorization)?.groupValues?.get(1)
-            ?: throw UnauthenticatedException("Bearer 인증 헤더가 없거나 형식이 올바르지 않습니다")
+            ?: throw DropgateException(ErrorCode.UNAUTHENTICATED, "Bearer 인증 헤더가 없거나 형식이 올바르지 않습니다")
         return try {
             val jwt = decoder.decode(token)
             val expiresAt = requireNotNull(jwt.expiresAt) { "토큰에 만료 시각 exp가 없습니다" }
@@ -41,11 +43,9 @@ class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
             require(userId.toString().equals(subject, ignoreCase = true)) { "sub가 표준 UUID 형식이 아닙니다" }
             userId
         } catch (exception: JwtException) {
-            throw UnauthenticatedException("액세스 토큰 검증 실패: ${exception.message}", exception)
+            throw DropgateException(ErrorCode.UNAUTHENTICATED, "액세스 토큰 검증 실패: ${exception.message}", cause = exception)
         } catch (exception: IllegalArgumentException) {
-            throw UnauthenticatedException("액세스 토큰 클레임 오류: ${exception.message}", exception)
+            throw DropgateException(ErrorCode.UNAUTHENTICATED, "액세스 토큰 클레임 오류: ${exception.message}", cause = exception)
         }
     }
 }
-
-class UnauthenticatedException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
