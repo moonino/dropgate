@@ -2,13 +2,13 @@ package dropgate.order.controller
 
 import dropgate.common.error.MISSING_VALUE_MESSAGE
 import dropgate.order.service.CreateDropCommand
+import dropgate.order.service.truncateToStoredPrecision
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 
 private const val MAX_NAME_LENGTH = 100
 private const val MIN_TOTAL_QUANTITY = 1L
@@ -44,5 +44,3 @@ data class CreateDropRequest(
 
     private fun <T : Any> requireValidated(value: T?, field: String): T = checkNotNull(value) { "검증을 거치지 않은 드롭 등록 요청입니다: $field 이 없습니다" }
 }
-
-internal fun Instant.truncateToStoredPrecision(): Instant = truncatedTo(ChronoUnit.MILLIS)

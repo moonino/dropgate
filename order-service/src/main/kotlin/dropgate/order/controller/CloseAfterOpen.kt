@@ -1,5 +1,6 @@
 package dropgate.order.controller
 
+import dropgate.order.service.truncateToStoredPrecision
 import jakarta.validation.Constraint
 import jakarta.validation.ConstraintValidator
 import jakarta.validation.ConstraintValidatorContext
