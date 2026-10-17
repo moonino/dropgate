@@ -7,11 +7,9 @@ import dropgate.common.authentication.JwtAuthenticationFilter
 import dropgate.common.authentication.PublicEndpoint
 import dropgate.common.authentication.RestClientJwkSetFetcher
 import dropgate.common.error.ErrorResponseWriter
-import dropgate.common.error.GlobalExceptionHandler
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Import
 import org.springframework.http.HttpMethod
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
@@ -30,11 +28,7 @@ private val ORDER_PUBLIC_ENDPOINTS = listOf(
 )
 
 @Configuration(proxyBeanMethods = false)
-@Import(GlobalExceptionHandler::class)
 class AuthenticationConfiguration : WebMvcConfigurer {
-    @Bean
-    fun systemClock(): Clock = Clock.systemUTC()
-
     @Bean
     fun accessTokenVerifier(@Value("\${dropgate.auth.jwks-uri}") jwkSetUri: URI, clock: Clock): AccessTokenVerifier {
         val fetcher = RestClientJwkSetFetcher(createJwksRestClient(), jwkSetUri)
