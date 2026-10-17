@@ -90,7 +90,6 @@ start_postgres() {
   log "PostgreSQL 16을 띄우고 orders 스키마와 order_user를 만듭니다"
   docker run -d --name "$POSTGRES_CONTAINER" -e POSTGRES_PASSWORD="$ORDER_DB_PASSWORD" -e POSTGRES_DB="$DATABASE_NAME" \
     -p "$POSTGRES_PORT:5432" "$POSTGRES_IMAGE" >/dev/null
-  wait_until "PostgreSQL" docker exec "$POSTGRES_CONTAINER" pg_isready -h 127.0.0.1 -U postgres -d "$DATABASE_NAME"
   wait_until "PostgreSQL 접속" run_psql -c "SELECT 1"
   run_psql -v ON_ERROR_STOP=1 -q \
     -c "CREATE ROLE order_user LOGIN PASSWORD '$ORDER_DB_PASSWORD'" \
