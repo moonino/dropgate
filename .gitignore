@@ -19,6 +19,11 @@ replay_pid*
 *.log
 logs/
 node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+web/AGENTS.md
+web/CLAUDE.md
 
 # secrets and local config
 .env
