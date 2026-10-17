@@ -144,7 +144,7 @@ run_k6() {
     /scripts/purchase.js
 }
 
-verify_accuracy() {
+print_accuracy_report() {
   local drop_id="$1"
   log "DB에서 초과, 중복, 재고 차를 대조합니다"
   run_psql -v ON_ERROR_STOP=1 -v drop_id="$drop_id" -P pager=off <"$ROOT_DIR/load/sql/verify-purchase-accuracy.sql"
@@ -184,7 +184,7 @@ main() {
   wait_until "드롭 OPEN 전이" is_drop_open "$drop_id"
   run_k6 "$drop_id"
   print_summary
-  verify_accuracy "$drop_id"
+  print_accuracy_report "$drop_id"
   print_environment
 }
 
