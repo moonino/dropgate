@@ -34,7 +34,7 @@ class PurchaseConcurrencyTest : OrderApiIntegrationTest() {
     }
 
     @Test
-    fun `같은 사용자가 200번 동시에 사도 주문은 1건이고 재고는 1개만 줄어든다`() {
+    fun `같은 사용자가 200번 동시에 사도 주문은 1건이다`() {
         val dropId = insertDropWithStock(totalQuantity = STOCK)
         val token = tokens.issueAccessToken(UUID.randomUUID())
 
@@ -42,6 +42,15 @@ class PurchaseConcurrencyTest : OrderApiIntegrationTest() {
 
         assertThat(statuses.count { it == CREATED }).isEqualTo(1)
         assertThat(countOrders(dropId)).isEqualTo(1)
+    }
+
+    @Test
+    fun `같은 사용자의 동시 중복 구매는 거절분 차감을 되돌려 재고가 1개만 줄어든다`() {
+        val dropId = insertDropWithStock(totalQuantity = STOCK)
+        val token = tokens.issueAccessToken(UUID.randomUUID())
+
+        purchaseConcurrently(dropId, List(REQUESTS) { token })
+
         assertThat(findRemainingQuantity(dropId)).isEqualTo(STOCK - 1)
     }
 
