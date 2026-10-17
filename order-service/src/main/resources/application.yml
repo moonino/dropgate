@@ -17,6 +17,3 @@ server:
 dropgate:
   auth:
     jwks-uri: ${DROPGATE_AUTH_JWKS_URI}
-  drops:
-    status-scheduler:
-      enabled: true
