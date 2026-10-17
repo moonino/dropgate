@@ -27,6 +27,7 @@ WAIT_ATTEMPTS=60
 ORDER_URL="http://localhost:$ORDER_PORT"
 ORDER_URL_FROM_DOCKER="http://host.docker.internal:$ORDER_PORT"
 ORDER_DB_PASSWORD="$(openssl rand -hex 16)"
+POSTGRES_SUPERUSER_PASSWORD="$(openssl rand -hex 16)"
 ORDER_PID=""
 
 log() {
@@ -88,7 +89,8 @@ run_psql() {
 
 start_postgres() {
   log "PostgreSQL 16을 띄우고 orders 스키마와 order_user를 만듭니다"
-  docker run -d --name "$POSTGRES_CONTAINER" -e POSTGRES_PASSWORD="$ORDER_DB_PASSWORD" -e POSTGRES_DB="$DATABASE_NAME" \
+  docker run -d --name "$POSTGRES_CONTAINER" \
+    -e POSTGRES_PASSWORD="$POSTGRES_SUPERUSER_PASSWORD" -e POSTGRES_DB="$DATABASE_NAME" \
     -p "$POSTGRES_PORT:5432" "$POSTGRES_IMAGE" >/dev/null
   wait_until "PostgreSQL 접속" run_psql -c "SELECT 1"
   run_psql -v ON_ERROR_STOP=1 -q \
