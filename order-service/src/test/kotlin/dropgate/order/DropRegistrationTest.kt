@@ -7,21 +7,25 @@ import java.util.UUID
 
 class DropRegistrationTest : DropApiIntegrationTest() {
     @Test
-    fun `ADMIN이 드롭을 등록하면 201과 Location과 SCHEDULED 드롭을 돌려준다`() {
+    fun `ADMIN이 드롭을 등록하면 201과 등록한 드롭을 가리키는 Location을 돌려준다`() {
         val response = postDrop(VALID_BODY, issueAdminToken())
             .expectStatus().isCreated
             .expectHeader().valueMatches(HttpHeaders.LOCATION, "/api/drops/[0-9a-f-]{36}")
-            .expectBody()
-            .jsonPath("$.name").isEqualTo("한정판 스니커즈")
+            .expectBody().returnResult()
+
+        assertThat(response.responseHeaders.location.toString()).endsWith(readJsonId(response.responseBodyContent))
+    }
+
+    @Test
+    fun `등록한 드롭을 요청 값대로 SCHEDULED 상태로 돌려준다`() {
+        postDrop(VALID_BODY, issueAdminToken()).expectStatus().isCreated
+            .expectBody().jsonPath("$.name").isEqualTo("한정판 스니커즈")
             .jsonPath("$.totalQuantity").isEqualTo(100)
             .jsonPath("$.openAt").isEqualTo("2030-11-01T10:00:00.000Z")
             .jsonPath("$.closeAt").isEqualTo("2030-11-01T11:00:00.000Z")
             .jsonPath("$.status").isEqualTo("SCHEDULED")
             .jsonPath("$.admissionRatePerSec").isEqualTo(50)
             .jsonPath("$.remainingQuantity").isEmpty
-            .returnResult()
-
-        assertThat(response.responseHeaders.location.toString()).endsWith(readJsonId(response.responseBodyContent))
     }
 
     @Test
