@@ -105,7 +105,7 @@ WHERE d.id = :'drop_id';
 ## 비교할 때 지킬 것
 
 - 재요청 2,000건 중 ALREADY_PURCHASED는 실행마다 13에서 26건뿐이고 나머지는 SOLD_OUT이다. ADR 0005대로 DB 경로는 차감이 UNIQUE 확인보다 먼저라, 품절 뒤 도착한 재요청은 SOLD_OUT을 받는다. 2주 차 Redis 경로는 같은 재요청에 ALREADY_PURCHASED를 돌려주므로 두 409의 분포는 경로끼리 다르게 나오는 것이 맞다. 중복 0의 근거는 응답 분포가 아니라 DB의 duplicated_users다.
-- ALREADY_PURCHASED가 0이 아니라는 것은 같은 사용자의 요청이 재고가 남아 있을 때 UNIQUE까지 닿았다는 뜻이다. 그래서 1인 1회 방어가 망가지면 duplicated_users가 0이 아니게 나올 수 있는 시나리오다.
+- ALREADY_PURCHASED가 0이 아니라는 것은 같은 사용자의 요청이 재고가 남아 있을 때 UNIQUE까지 닿았다는 뜻이다. 따라서 이 부하는 UNIQUE 방어를 실제로 거치며, 방어가 깨지면 duplicated_users로 드러난다.
 - 201의 p50이 409보다 높다. 원인은 따로 재지 않았다.
 - 실행마다 p99가 크게 움직였다(652에서 1,164ms). 마지막 묶음 직후 `uptime`의 1분 load average가 6.27이었고 `ps -Ao pcpu,comm -r`에서 화상 회의 앱이 CPU 65.6%를 쓰고 있었다. 부하 발생기와 서비스와 DB가 같은 Mac을 나눠 쓰므로, 전후 비교는 한 번이 아니라 같은 명령 여러 번의 범위끼리 하고 다른 무거운 앱을 끈 상태에서 한다.
 - 예열이 없어 JIT 전 요청이 포함된다. 2주 차 측정도 같은 스크립트로 새 JVM에서 시작해야 공정하다.
