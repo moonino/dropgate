@@ -11,12 +11,12 @@ describe("decideCancelControl", () => {
   });
 
   it("마감 뒤라 거절되면 버튼 대신 서버 문구를 보여 준다", () => {
-    const rejection = { kind: "rejected", code: "DROP_CLOSED", message: "마감한 드롭의 주문은 취소할 수 없습니다" } as const;
+    const rejection = { kind: "rejected", code: "DROP_CLOSED", message: "마감한 드롭의 주문은 취소할 수 없습니다", retryAfterSeconds: undefined } as const;
     expect(decideCancelControl({ status: "CONFIRMED" }, rejection)).toEqual({ kind: "note", text: "마감한 드롭의 주문은 취소할 수 없습니다" });
   });
 
   it("일시적인 실패면 버튼을 남겨 다시 시도하게 한다", () => {
-    const rejection = { kind: "rejected", code: "STOCK_UNAVAILABLE", message: "잠시 뒤 다시" } as const;
+    const rejection = { kind: "rejected", code: "STOCK_UNAVAILABLE", message: "잠시 뒤 다시", retryAfterSeconds: undefined } as const;
     expect(decideCancelControl({ status: "CONFIRMED" }, rejection)).toEqual({ kind: "button" });
   });
 });

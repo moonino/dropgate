@@ -23,13 +23,22 @@ describe("BuyPanel", () => {
   });
 
   it("서버가 품절이라고 답하면 서버 문구를 그대로 보여 주고 버튼을 품절로 닫는다", async () => {
-    const purchase = vi.fn().mockResolvedValue({ kind: "rejected", code: "SOLD_OUT", message: "재고가 모두 소진됐습니다" });
+    const purchase = vi.fn().mockResolvedValue({ kind: "rejected", code: "SOLD_OUT", message: "재고가 모두 소진됐습니다", retryAfterSeconds: undefined });
     render(<BuyPanel drop={createDrop()} signedIn purchase={purchase} />);
 
     await userEvent.click(screen.getByRole("button", { name: "구매하기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("재고가 모두 소진됐습니다");
     expect(screen.getByRole("button", { name: "품절" })).toBeDisabled();
+  });
+
+  it("503이면 서버 문구에 Retry-After 초 뒤 다시 시도하라는 안내를 붙인다", async () => {
+    const purchase = vi.fn().mockResolvedValue({ kind: "rejected", code: "STOCK_UNAVAILABLE", message: "재고 서버가 바쁩니다.", retryAfterSeconds: 2 });
+    render(<BuyPanel drop={createDrop()} signedIn purchase={purchase} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "구매하기" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("재고 서버가 바쁩니다. 2초 뒤 다시 시도해 주세요.");
   });
 
   it("오픈 전 드롭은 오픈 시각을 적은 닫힌 버튼을 보여 준다", () => {

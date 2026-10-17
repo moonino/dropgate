@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import type { DropPage } from "@/api/types";
 import { DropBoard } from "@/components/DropBoard";
-import { callBackend } from "@/server/backend";
+import { UnavailableNotice } from "@/components/UnavailableNotice";
+import { callBackendOrUnavailable } from "@/server/backend";
 import { loadDropsPage } from "./actions";
 
 export const metadata: Metadata = { title: "드롭" };
 export const dynamic = "force-dynamic";
 
 export default async function DropsPage() {
-  const firstPage = await callBackend<DropPage>("order", "/api/drops");
+  const firstPage = await callBackendOrUnavailable<DropPage>("order", "/api/drops");
   return (
     <main className="page">
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 20 }}>
@@ -20,7 +21,7 @@ export default async function DropsPage() {
           오픈 시각 순서입니다. 판매가 끝난 드롭은 보드에서 내려갑니다.
         </p>
       </div>
-      <DropBoard firstPage={firstPage} loadPage={loadDropsPage} />
+      {firstPage.kind === "ok" ? <DropBoard firstPage={firstPage.body} loadPage={loadDropsPage} /> : <UnavailableNotice message={firstPage.notice} />}
     </main>
   );
 }

@@ -9,6 +9,8 @@
   --color-accent: #c8f23c;
   --color-danger: #ff6b5e;
   --color-warning: #ffb547;
+  --color-kakao-container: #fee500;
+  --color-kakao-label: #191919;
   --radius-panel: 20px;
   --radius-control: 10px;
   --page-max-width: 1200px;
@@ -174,6 +176,17 @@ a:hover {
   color: var(--color-bg);
 }
 
+.button--kakao {
+  border: 0;
+  background: var(--color-kakao-container);
+  color: var(--color-kakao-label);
+  font-weight: 700;
+}
+
+.button--kakao:hover {
+  color: var(--color-kakao-label);
+}
+
 .button--danger {
   border-color: var(--color-danger);
   background: transparent;
@@ -207,6 +220,10 @@ a:hover {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-bg);
+}
+
+.badge--accent-outline {
+  border-color: var(--color-accent);
 }
 
 .badge--muted {

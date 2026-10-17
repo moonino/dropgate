@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import type { Drop } from "@/api/types";
 import { BuyPanel } from "@/components/BuyPanel";
 import { Countdown } from "@/components/Countdown";
+import { SaleOpenAnnouncement } from "@/components/SaleOpenAnnouncement";
 import { StatusBadge } from "@/components/StatusBadge";
+import { UnavailableNotice } from "@/components/UnavailableNotice";
 import { decideCountdownTarget } from "@/domain/purchase";
 import { DROP_STATUS_BADGES, formatStock } from "@/domain/status";
 import { formatKstDay, formatKstStamp, formatKstTime } from "@/domain/time";
-import { callBackend } from "@/server/backend";
+import { callBackendOrUnavailable, type BackendResult } from "@/server/backend";
 import { BackendError } from "@/server/backend-error";
 import { readServerTimeMillis } from "@/server/clock";
 import { readRequestViewer } from "@/server/request-session";
@@ -20,7 +22,15 @@ type DropPageProps = { params: Promise<{ dropId: string }> };
 
 export default async function DropDetailPage({ params }: DropPageProps) {
   const { dropId } = await params;
-  const [drop, viewer] = await Promise.all([fetchDrop(dropId), readRequestViewer()]);
+  const [fetched, viewer] = await Promise.all([fetchDrop(dropId), readRequestViewer()]);
+  if (fetched.kind === "unavailable") {
+    return (
+      <main className="page" style={{ paddingTop: 32 }}>
+        <UnavailableNotice message={fetched.notice} />
+      </main>
+    );
+  }
+  const drop = fetched.body;
   const target = decideCountdownTarget(drop);
   return (
     <main className="page" style={{ paddingTop: 32 }}>
@@ -33,15 +43,16 @@ export default async function DropDetailPage({ params }: DropPageProps) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         <section className="panel" aria-label="카운트다운과 구매" style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 28 }}>
           {target.kind === "counting" ? (
-            <Countdown label={target.label} targetIso={target.targetIso} absoluteLabel={`${formatKstDay(target.targetIso)} ${formatKstTime(target.targetIso)} ${target.milestone}`}
+            <Countdown key={target.targetIso} label={target.label} targetIso={target.targetIso} absoluteLabel={`${formatKstDay(target.targetIso)} ${formatKstTime(target.targetIso)} ${target.milestone}`}
               renderedAtMillis={readServerTimeMillis()}
             />
           ) : (
             <p style={{ margin: 0, fontSize: 20 }}>{formatKstDay(drop.closeAt)} {formatKstTime(drop.closeAt)} 마감했습니다</p>
           )}
           <div style={{ flex: "0 1 340px", minWidth: 260 }}>
-            <BuyPanel drop={drop} signedIn={viewer.kind === "signed-in"} purchase={purchaseDrop} />
+            <BuyPanel drop={drop} signedIn={viewer.kind !== "anonymous"} purchase={purchaseDrop} />
           </div>
+          <SaleOpenAnnouncement status={drop.status} />
         </section>
         <section className="panel" aria-label="남은 수량">
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>남은 수량</p>
@@ -77,9 +88,9 @@ function ScheduleRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-async function fetchDrop(dropId: string): Promise<Drop> {
+async function fetchDrop(dropId: string): Promise<BackendResult<Drop>> {
   try {
-    return await callBackend<Drop>("order", `/api/drops/${encodeURIComponent(dropId)}`);
+    return await callBackendOrUnavailable<Drop>("order", `/api/drops/${encodeURIComponent(dropId)}`);
   } catch (error) {
     if (error instanceof BackendError && (error.status === 404 || error.status === 400)) notFound();
     throw error;

@@ -26,6 +26,6 @@ export async function purchaseDrop(dropId: string): Promise<PurchaseOutcome> {
       clearSession(cookieStore);
       redirect("/login");
     }
-    return { kind: "rejected", code: error.code, message: error.message };
+    return { kind: "rejected", code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds };
   }
 }

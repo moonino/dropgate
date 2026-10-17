@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { Drop } from "@/api/types";
 import { decideBuyButton, type PurchaseOutcome } from "@/domain/purchase";
+import { appendRetryAfter } from "@/domain/retry";
 import { formatKstStamp, formatKstTime } from "@/domain/time";
 
 type BuyPanelProps = {
@@ -46,7 +47,7 @@ export function BuyPanel({ drop, signedIn, purchase }: BuyPanelProps) {
           <Link href="/orders">내 주문에서 보기</Link>
         </div>
       )}
-      {outcome?.kind === "rejected" && <p role="alert" style={{ margin: 0, fontSize: 14 }}>{outcome.message}</p>}
+      {outcome?.kind === "rejected" && <p role="alert" style={{ margin: 0, fontSize: 14 }}>{appendRetryAfter(outcome.message, outcome.retryAfterSeconds)}</p>}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import type { Drop } from "@/api/types";
 
 export type PurchaseOutcome =
   | { kind: "confirmed"; orderId: string; confirmedAt: string }
-  | { kind: "rejected"; code: string; message: string };
+  | { kind: "rejected"; code: string; message: string; retryAfterSeconds: number | undefined };
 
 export type BuyButton = { kind: "enabled"; label: string } | { kind: "disabled"; label: string };
 

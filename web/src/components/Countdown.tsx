@@ -6,7 +6,6 @@ import { splitRemainingTime } from "@/domain/time";
 import { useNow } from "./use-now";
 
 const TICK_MILLIS = 1000;
-const FINISHED_MESSAGE = "시각이 됐습니다. 상태를 확인합니다";
 const MILESTONES = [
   { seconds: 600, message: "10분 남았습니다" },
   { seconds: 60, message: "1분 남았습니다" },
@@ -21,7 +20,7 @@ export function Countdown({ label, targetIso, absoluteLabel, renderedAtMillis }:
   const [initialSecondsLeft] = useState(() => countSecondsLeft(targetIso, renderedAtMillis));
   const refreshed = useRef(false);
   const remaining = splitRemainingTime(targetIso, now);
-  const announcement = decideAnnouncement(initialSecondsLeft, countSecondsLeft(targetIso, now), remaining.finished);
+  const announcement = decideAnnouncement(initialSecondsLeft, countSecondsLeft(targetIso, now));
 
   useEffect(() => {
     if (remaining.finished && !refreshed.current) {
@@ -69,8 +68,7 @@ function countSecondsLeft(targetIso: string, nowMillis: number): number {
   return Math.ceil((Date.parse(targetIso) - nowMillis) / TICK_MILLIS);
 }
 
-function decideAnnouncement(initialSecondsLeft: number, secondsLeft: number, finished: boolean): string {
-  if (finished) return FINISHED_MESSAGE;
+function decideAnnouncement(initialSecondsLeft: number, secondsLeft: number): string {
   const crossed = MILESTONES.filter((milestone) => milestone.seconds < initialSecondsLeft && secondsLeft <= milestone.seconds);
   return crossed.at(-1)?.message ?? "";
 }

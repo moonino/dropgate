@@ -15,7 +15,7 @@ describe("DropBoard", () => {
   });
 
   it("더 보기를 누르면 다음 커서로 불러와 뒤에 붙인다", async () => {
-    const loadPage = vi.fn().mockResolvedValue({ items: [createDrop({ id: "next", name: "다음 드롭" })], nextCursor: null });
+    const loadPage = vi.fn().mockResolvedValue({ kind: "ok", body: { items: [createDrop({ id: "next", name: "다음 드롭" })], nextCursor: null } });
     render(<DropBoard firstPage={{ items: [createDrop()], nextCursor: "cursor-1" }} loadPage={loadPage} />);
 
     await userEvent.click(screen.getByRole("button", { name: "더 보기" }));
@@ -23,6 +23,16 @@ describe("DropBoard", () => {
     expect(loadPage).toHaveBeenCalledWith("cursor-1");
     expect(await screen.findByText("다음 드롭")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
+  });
+
+  it("더 보기가 503이면 보드를 두고 다시 시도 안내를 보여 준다", async () => {
+    const loadPage = vi.fn().mockResolvedValue({ kind: "unavailable", notice: "잠시 바쁩니다. 2초 뒤 다시 시도해 주세요." });
+    render(<DropBoard firstPage={{ items: [createDrop()], nextCursor: "cursor-1" }} loadPage={loadPage} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "더 보기" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("잠시 바쁩니다. 2초 뒤 다시 시도해 주세요.");
+    expect(screen.getByRole("listitem")).toBeInTheDocument();
   });
 
   it("드롭이 없으면 빈 보드 안내를 보여 준다", () => {

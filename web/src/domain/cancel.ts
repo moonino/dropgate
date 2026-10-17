@@ -1,6 +1,6 @@
 import type { Order } from "@/api/types";
 
-export type CancelOutcome = { kind: "canceled"; order: Order } | { kind: "rejected"; code: string; message: string };
+export type CancelOutcome = { kind: "canceled"; order: Order } | { kind: "rejected"; code: string; message: string; retryAfterSeconds: number | undefined };
 
 export type CancelControl = { kind: "button" } | { kind: "note"; text: string };
 

@@ -1,6 +1,6 @@
 import type { Drop, DropStatus, OrderStatus } from "@/api/types";
 
-export type BadgeTone = "outline" | "accent" | "muted" | "dashed";
+export type BadgeTone = "outline" | "accent" | "accent-outline" | "muted" | "dashed";
 
 export type Badge = { label: string; tone: BadgeTone };
 
@@ -12,7 +12,7 @@ export const DROP_STATUS_BADGES: Record<DropStatus, Badge> = {
 };
 
 export const ORDER_STATUS_BADGES: Record<OrderStatus, Badge> = {
-  CONFIRMED: { label: "확정", tone: "outline" },
+  CONFIRMED: { label: "확정", tone: "accent-outline" },
   CANCELED: { label: "취소됨", tone: "dashed" },
 };
 

@@ -5,23 +5,31 @@ import { useState, useTransition } from "react";
 import type { Drop, DropPage } from "@/api/types";
 import { DROP_STATUS_BADGES, formatStock } from "@/domain/status";
 import { formatKstDay, formatKstTime } from "@/domain/time";
+import type { BackendResult } from "@/server/backend";
 import { StatusBadge } from "./StatusBadge";
+import { UnavailableNotice } from "./UnavailableNotice";
 
 type DropBoardProps = {
   firstPage: DropPage;
-  loadPage: (cursor: string) => Promise<DropPage>;
+  loadPage: (cursor: string) => Promise<BackendResult<DropPage>>;
 };
 
 export function DropBoard({ firstPage, loadPage }: DropBoardProps) {
   const [drops, setDrops] = useState<Drop[]>(firstPage.items);
   const [nextCursor, setNextCursor] = useState<string | null>(firstPage.nextCursor);
+  const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
 
   const loadMore = (cursor: string) =>
     startTransition(async () => {
-      const page = await loadPage(cursor);
-      setDrops((current) => [...current, ...page.items]);
-      setNextCursor(page.nextCursor);
+      const result = await loadPage(cursor);
+      if (result.kind === "unavailable") {
+        setNotice(result.notice);
+        return;
+      }
+      setNotice("");
+      setDrops((current) => [...current, ...result.body.items]);
+      setNextCursor(result.body.nextCursor);
     });
 
   if (drops.length === 0) return <p className="notice">지금 보드에 올라온 드롭이 없습니다.</p>;
@@ -33,6 +41,7 @@ export function DropBoard({ firstPage, loadPage }: DropBoardProps) {
           <DropRow key={drop.id} drop={drop} />
         ))}
       </ol>
+      {notice && <UnavailableNotice message={notice} />}
       {nextCursor !== null && (
         <div style={{ display: "flex", justifyContent: "center" }}>
           <button type="button" className="button" disabled={pending} onClick={() => loadMore(nextCursor)}>

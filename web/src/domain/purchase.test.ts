@@ -11,12 +11,12 @@ describe("decideBuyButton", () => {
   });
 
   it("서버가 이미 구매했다고 답하면 그 상태로 닫는다", () => {
-    const outcome = { kind: "rejected", code: "ALREADY_PURCHASED", message: "이미 구매했습니다" } as const;
+    const outcome = { kind: "rejected", code: "ALREADY_PURCHASED", message: "이미 구매했습니다", retryAfterSeconds: undefined } as const;
     expect(decideBuyButton({ status: "OPEN" }, "19:30", outcome)).toEqual({ kind: "disabled", label: "이미 구매함" });
   });
 
   it("다시 시도할 수 있는 실패면 버튼을 열어 둔다", () => {
-    const outcome = { kind: "rejected", code: "STOCK_UNAVAILABLE", message: "잠시 뒤 다시 시도해 주세요" } as const;
+    const outcome = { kind: "rejected", code: "STOCK_UNAVAILABLE", message: "잠시 뒤 다시 시도해 주세요", retryAfterSeconds: undefined } as const;
     expect(decideBuyButton({ status: "OPEN" }, "19:30", outcome)).toEqual({ kind: "enabled", label: "다시 시도" });
   });
 

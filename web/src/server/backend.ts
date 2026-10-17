@@ -1,3 +1,4 @@
+import { appendRetryAfter } from "@/domain/retry";
 import { BackendError } from "./backend-error";
 import { isMockMode, readBaseUrl, type BackendService } from "./config";
 
@@ -14,13 +15,33 @@ export async function callBackend<T>(service: BackendService, path: string, requ
   return (await response.json()) as T;
 }
 
+export type BackendResult<T> = { kind: "ok"; body: T } | { kind: "unavailable"; notice: string };
+
+export async function callBackendOrUnavailable<T>(service: BackendService, path: string, request: BackendRequest = {}): Promise<BackendResult<T>> {
+  try {
+    return { kind: "ok", body: await callBackend<T>(service, path, request) };
+  } catch (error) {
+    if (error instanceof BackendError && error.isUnavailable()) return { kind: "unavailable", notice: appendRetryAfter(error.message, error.retryAfterSeconds) };
+    throw error;
+  }
+}
+
 export async function sendBackendRequest(service: BackendService, path: string, request: BackendRequest): Promise<Response> {
   const outgoing = createRequest(`${readBaseUrl(service)}${path}`, request);
   if (isMockMode()) {
     const { sendMockRequest } = await import("./mock/mock-transport");
     return sendMockRequest(outgoing);
   }
-  return fetch(outgoing, { cache: "no-store" });
+  return fetchOrUnreachable(outgoing);
+}
+
+async function fetchOrUnreachable(outgoing: Request): Promise<Response> {
+  try {
+    return await fetch(outgoing, { cache: "no-store" });
+  } catch (error) {
+    if (error instanceof TypeError) throw BackendError.unreachable();
+    throw error;
+  }
 }
 
 function createRequest(url: string, request: BackendRequest): Request {

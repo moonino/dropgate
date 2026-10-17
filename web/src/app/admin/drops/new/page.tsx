@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DropForm } from "@/components/DropForm";
+import { UnavailableNotice } from "@/components/UnavailableNotice";
+import { describeAuthUnavailable } from "@/domain/login-errors";
 import { readRequestViewer } from "@/server/request-session";
 import { isAdmin } from "@/server/viewer";
 import { createDropAction } from "./actions";
@@ -11,6 +13,14 @@ export const dynamic = "force-dynamic";
 export default async function NewDropPage() {
   const viewer = await readRequestViewer();
   if (viewer.kind === "anonymous") redirect("/login");
+  if (viewer.kind === "unavailable") {
+    return (
+      <main className="page">
+        <h1 className="page-title__heading">드롭 등록</h1>
+        <UnavailableNotice message={describeAuthUnavailable(viewer.retryAfterSeconds)} />
+      </main>
+    );
+  }
   if (!isAdmin(viewer)) {
     return (
       <main className="page">

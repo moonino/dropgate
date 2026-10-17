@@ -3,14 +3,16 @@
 import { useState, useTransition } from "react";
 import type { Order, OrderPage } from "@/api/types";
 import { decideCancelControl, type CancelOutcome } from "@/domain/cancel";
+import { appendRetryAfter } from "@/domain/retry";
 import { ORDER_STATUS_BADGES } from "@/domain/status";
 import { formatKstStamp } from "@/domain/time";
+import type { BackendResult } from "@/server/backend";
 import { StatusBadge } from "./StatusBadge";
 
 type OrderListProps = {
   firstPage: OrderPage;
   cancel: (orderId: string) => Promise<CancelOutcome>;
-  loadPage: (cursor: string) => Promise<OrderPage>;
+  loadPage: (cursor: string) => Promise<BackendResult<OrderPage>>;
 };
 
 export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
@@ -29,14 +31,18 @@ export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
         return;
       }
       setRejections((current) => ({ ...current, [orderId]: outcome }));
-      setNotice(outcome.message);
+      setNotice(appendRetryAfter(outcome.message, outcome.retryAfterSeconds));
     });
 
   const loadMore = (cursor: string) =>
     startTransition(async () => {
-      const page = await loadPage(cursor);
-      setOrders((current) => [...current, ...page.items]);
-      setNextCursor(page.nextCursor);
+      const result = await loadPage(cursor);
+      if (result.kind === "unavailable") {
+        setNotice(result.notice);
+        return;
+      }
+      setOrders((current) => [...current, ...result.body.items]);
+      setNextCursor(result.body.nextCursor);
     });
 
   if (orders.length === 0) return <p className="notice">아직 주문이 없습니다.</p>;

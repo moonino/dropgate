@@ -3,6 +3,7 @@ import type { Badge } from "@/domain/status";
 const TONE_CLASSES: Record<Badge["tone"], string> = {
   outline: "badge",
   accent: "badge badge--accent",
+  "accent-outline": "badge badge--accent-outline",
   muted: "badge badge--muted",
   dashed: "badge badge--dashed",
 };

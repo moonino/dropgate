@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { describeAuthUnavailable } from "@/domain/login-errors";
 import { readServerTimeMillis } from "@/server/clock";
 import { readRequestViewer } from "@/server/request-session";
 import { isAdmin, type Viewer } from "@/server/viewer";
@@ -31,6 +32,13 @@ export async function SiteHeader() {
 }
 
 function ViewerControls({ viewer }: { viewer: Viewer }) {
+  if (viewer.kind === "unavailable") {
+    return (
+      <p role="status" className="muted" style={{ margin: 0, fontSize: 13 }}>
+        {describeAuthUnavailable(viewer.retryAfterSeconds)}
+      </p>
+    );
+  }
   if (viewer.kind === "anonymous") {
     return (
       <Link href="/login" className="button button--small">

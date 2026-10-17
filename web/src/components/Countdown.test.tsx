@@ -28,7 +28,14 @@ describe("Countdown", () => {
     act(() => vi.advanceTimersByTime(5000));
 
     expect(refresh).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status")).toHaveTextContent("시각이 됐습니다. 상태를 확인합니다");
+  });
+
+  it("0이 돼도 판매가 열렸는지 짐작해 알리지 않는다", () => {
+    render(<Countdown label="오픈까지" targetIso="2026-10-17T10:30:00.000Z" absoluteLabel="10월 17일 (토) 19:30" renderedAtMillis={Date.now()} />);
+
+    act(() => vi.advanceTimersByTime(5000));
+
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
   it("10초 전에 한 번 알린다", () => {

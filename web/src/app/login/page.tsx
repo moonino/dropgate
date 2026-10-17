@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import { decideLoginNotice } from "@/domain/login-errors";
+import { parseRetryAfterSeconds } from "@/domain/retry";
 import { isMockMode } from "@/server/config";
 
 export const metadata: Metadata = { title: "로그인" };
 
-type LoginPageProps = { searchParams: Promise<{ error?: string }> };
+type LoginPageProps = { searchParams: Promise<{ error?: string; retryAfter?: string }> };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const notice = decideLoginNotice((await searchParams).error);
+  const { error, retryAfter } = await searchParams;
+  const notice = decideLoginNotice(error, parseRetryAfterSeconds(retryAfter));
   return (
     <main className="page" style={{ maxWidth: 520, paddingTop: 80 }}>
       <div className="page-title">
@@ -34,7 +36,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
 function KakaoLogin() {
   return (
-    <a href="/auth/login/kakao" className="button button--large" style={{ background: "#FEE500", color: "#191919", border: 0, borderRadius: 12 }}>
+    <a href="/auth/login/kakao" className="button button--large button--kakao">
       카카오 로그인
     </a>
   );
