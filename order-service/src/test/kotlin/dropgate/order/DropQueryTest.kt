@@ -10,6 +10,13 @@ class DropQueryTest : DropApiIntegrationTest() {
 
         http.get().uri("/api/drops/$dropId").exchange()
             .expectStatus().isOk
+    }
+
+    @Test
+    fun `드롭 단건은 저장한 드롭의 id와 status와 openAt을 돌려준다`() {
+        val dropId = insertDrop()
+
+        http.get().uri("/api/drops/$dropId").exchange()
             .expectBody()
             .jsonPath("$.id").isEqualTo(dropId.toString())
             .jsonPath("$.status").isEqualTo("SCHEDULED")
