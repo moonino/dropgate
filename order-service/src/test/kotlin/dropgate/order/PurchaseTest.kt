@@ -34,6 +34,52 @@ class PurchaseTest : OrderApiIntegrationTest() {
     }
 
     @Test
+    fun `구매하면 원장에 확정 시각과 같은 시각의 CONFIRMED 항목을 남긴다`() {
+        val dropId = insertDropWithStock()
+        val userId = UUID.randomUUID()
+        val orderId = purchaseOrderId(dropId, userId)
+
+        val entry = jdbc.sql(
+            """
+            SELECT l.drop_id, l.user_id, l.entry_type, l.occurred_at = o.confirmed_at AS same_time
+            FROM orders.order_ledger l JOIN orders.orders o ON o.id = l.order_id
+            WHERE l.order_id = :orderId
+            """,
+        ).param("orderId", orderId)
+            .query { rs, _ -> listOf(rs.getObject("drop_id"), rs.getObject("user_id"), rs.getString("entry_type"), rs.getBoolean("same_time")) }
+            .single()
+        assertThat(entry).containsExactly(dropId, userId, "CONFIRMED", true)
+    }
+
+    @Test
+    fun `구매하면 outbox에 order confirmed 이벤트를 PENDING으로 남긴다`() {
+        val orderId = purchaseOrderId(insertDropWithStock(), UUID.randomUUID())
+
+        val event = jdbc.sql("SELECT aggregate_type, aggregate_id, event_type, status FROM orders.outbox")
+            .query { rs, _ -> listOf(rs.getString("aggregate_type"), rs.getObject("aggregate_id"), rs.getString("event_type"), rs.getString("status")) }
+            .single()
+        assertThat(event).containsExactly("order", orderId, "order.confirmed", "PENDING")
+    }
+
+    @Test
+    fun `order confirmed 페이로드는 이벤트 명세 v1 필드를 담는다`() {
+        val dropId = insertDropWithStock()
+        val userId = UUID.randomUUID()
+        val orderId = purchaseOrderId(dropId, userId)
+
+        val payload = OutboxPayload.findByEventType(jdbc, "order.confirmed")
+        assertThat(payload.readKeys()).containsExactlyInAnyOrder("orderId", "dropId", "dropName", "userId", "quantity", "status", "confirmedAt", "canceledAt")
+        assertThat(payload.readText("orderId")).isEqualTo(orderId.toString())
+        assertThat(payload.readText("dropId")).isEqualTo(dropId.toString())
+        assertThat(payload.readText("dropName")).isEqualTo(DROP_NAME)
+        assertThat(payload.readText("userId")).isEqualTo(userId.toString())
+        assertThat(payload.readNumber("quantity")).isEqualTo(1)
+        assertThat(payload.readText("status")).isEqualTo("CONFIRMED")
+        assertThat(payload.readText("confirmedAt")).matches(UTC_MILLIS_REGEX)
+        assertThat(payload.isNull("canceledAt")).isTrue()
+    }
+
+    @Test
     fun `남은 수량이 0인 OPEN 드롭은 409 SOLD_OUT을 돌려준다`() {
         val dropId = insertDropWithStock(totalQuantity = 1, remainingQuantity = 0)
 
@@ -89,6 +135,15 @@ class PurchaseTest : OrderApiIntegrationTest() {
         purchase(dropId, userId).expectStatus().isCreated
 
         expectConflict(dropId, "SOLD_OUT", userId)
+    }
+
+    @Test
+    fun `거절한 구매는 주문과 원장과 outbox를 남기지 않는다`() {
+        val dropId = insertDropWithStock(totalQuantity = 1, remainingQuantity = 0)
+
+        purchase(dropId, UUID.randomUUID()).expectStatus().isEqualTo(409)
+
+        assertThat(listOf(countRows("orders"), countRows("order_ledger"), countRows("outbox"))).containsOnly(0L)
     }
 
     @Test
