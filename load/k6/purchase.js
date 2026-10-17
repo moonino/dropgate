@@ -52,13 +52,15 @@ const recordOutcome = (response) => {
     return;
   }
   const code = readErrorCode(response);
-  if (response.status === CONFLICT_STATUS && code === SOLD_OUT_CODE) {
-    soldOutRejections.add(1);
-    return;
-  }
-  if (response.status === CONFLICT_STATUS && code === ALREADY_PURCHASED_CODE) {
-    alreadyPurchasedRejections.add(1);
-    return;
+  if (response.status === CONFLICT_STATUS) {
+    if (code === SOLD_OUT_CODE) {
+      soldOutRejections.add(1);
+      return;
+    }
+    if (code === ALREADY_PURCHASED_CODE) {
+      alreadyPurchasedRejections.add(1);
+      return;
+    }
   }
   unexpectedResponses.add(1, { status: String(response.status), code: String(code) });
 };
