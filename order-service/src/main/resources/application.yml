@@ -4,3 +4,7 @@ spring:
 
 server:
   port: 8082
+
+dropgate:
+  auth:
+    jwks-uri: ${DROPGATE_AUTH_JWKS_URI}
