@@ -114,7 +114,7 @@ class DropRegistrationTest : DropApiIntegrationTest() {
     }
 
     @ParameterizedTest
-    @MethodSource("invalidFields")
+    @MethodSource("provideInvalidFields")
     fun `규칙을 어긴 필드는 그 필드를 errors에 담아 400 VALIDATION_FAILED를 돌려준다`(field: String, value: String) {
         val body = """{"name":"드롭","totalQuantity":1,"openAt":"2030-11-01T10:00:00Z","closeAt":"2030-11-01T11:00:00Z","$field":$value}"""
 
@@ -167,7 +167,7 @@ class DropRegistrationTest : DropApiIntegrationTest() {
         private const val VALID_BODY = """{"name":"한정판 스니커즈","totalQuantity":100,"openAt":"2030-11-01T10:00:00Z","closeAt":"2030-11-01T11:00:00Z"}"""
 
         @JvmStatic
-        fun invalidFields(): List<Arguments> = listOf(
+        fun provideInvalidFields(): List<Arguments> = listOf(
             Arguments.of("name", "\"   \""),
             Arguments.of("name", "\"${"가".repeat(MAX_NAME_LENGTH + 1)}\""),
             Arguments.of("totalQuantity", "0"),
