@@ -4,7 +4,7 @@ import { groupFieldErrors, parseDropForm } from "./drop-form";
 const VALID_FIELDS = { name: "[테스트] 드롭", totalQuantity: "100", admissionRatePerSec: "50", openAt: "2026-10-20T19:00", closeAt: "2026-10-21T19:00" };
 
 describe("parseDropForm", () => {
-  it("한국 시각 입력을 UTC로 바꾸고 숫자를 정수로 읽는다", () => {
+  it("유효한 입력을 드롭 생성 요청 본문으로 바꾼다", () => {
     expect(parseDropForm(VALID_FIELDS)).toEqual({
       kind: "valid",
       request: { name: "[테스트] 드롭", totalQuantity: 100, admissionRatePerSec: 50, openAt: "2026-10-20T10:00:00.000Z", closeAt: "2026-10-21T10:00:00.000Z" },
