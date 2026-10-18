@@ -29,6 +29,11 @@ class OrderEntity(
     var canceledAt: Instant? = canceledAt
         protected set
 
+    fun cancel(at: Instant) {
+        status = OrderStatus.CANCELED
+        canceledAt = at
+    }
+
     companion object {
         const val SINGLE_ITEM_QUANTITY = 1
 

@@ -19,6 +19,7 @@ private const val NO_ROWS = 0
 class OrderConfirmationService(
     private val drops: DropRepository,
     private val orders: OrderRepository,
+    private val history: OrderHistoryRecorder,
     private val identifiers: UuidV7Generator,
     private val clock: Clock,
 ) {
@@ -30,7 +31,8 @@ class OrderConfirmationService(
         if (orders.insertConfirmedUnlessPurchased(order.id, order.dropId, order.userId, order.quantity, order.confirmedAt) == NO_ROWS) {
             throw DropgateException(ErrorCode.ALREADY_PURCHASED, "사용자 $userId 는 드롭 $dropId 를 이미 구매했습니다")
         }
-        return ConfirmedOrder(OrderResponse.createFrom(order, drop.name))
+        history.recordConfirmed(order, drop.name)
+        return ConfirmedOrder(OrderResponse.createFrom(order, drop.name), stockExhausted = drop.remainingQuantity == 0)
     }
 
     private fun rejectPurchase(dropId: UUID): DropgateException {
@@ -42,4 +44,4 @@ class OrderConfirmationService(
     }
 }
 
-data class ConfirmedOrder(val order: OrderResponse)
+data class ConfirmedOrder(val order: OrderResponse, val stockExhausted: Boolean)
