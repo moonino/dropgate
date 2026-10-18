@@ -45,7 +45,7 @@ class JwtAuthenticationFilterTest {
     @Test
     fun `유효한 토큰이면 인증된 사용자를 요청에 담아 넘긴다`() {
         val userId = UUID.randomUUID()
-        val request = authorizedRequest("POST", "/api/drops/1/orders", issuer.issueAccessToken(userId))
+        val request = createAuthorizedRequest("POST", "/api/drops/1/orders", issuer.issueAccessToken(userId))
         val chain = MockFilterChain()
         filter().run(request, chain)
         assertThat(chain.request!!.getAttribute(AuthenticatedUser.REQUEST_ATTRIBUTE)).isEqualTo(AuthenticatedUser(userId, Role.USER))
@@ -68,7 +68,7 @@ class JwtAuthenticationFilterTest {
     @Test
     fun `JWKS를 받지 못하면 503 AUTH_UNAVAILABLE과 Retry-After를 쓴다`() {
         val unavailable = JwkSetFetcher { throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "JWKS 서버 응답 없음") }
-        val request = authorizedRequest("POST", "/api/drops/1/orders", issuer.issueAccessToken())
+        val request = createAuthorizedRequest("POST", "/api/drops/1/orders", issuer.issueAccessToken())
         val response = filter(unavailable).run(request, MockFilterChain())
         assertThat(response.status).isEqualTo(503)
         assertThat(response.getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo("2")
@@ -83,7 +83,7 @@ class JwtAuthenticationFilterTest {
 
     private fun JwtAuthenticationFilter.run(request: MockHttpServletRequest, chain: MockFilterChain): MockHttpServletResponse = MockHttpServletResponse().also { doFilter(request, it, chain) }
 
-    private fun authorizedRequest(method: String, path: String, token: String) = MockHttpServletRequest(method, path).apply {
+    private fun createAuthorizedRequest(method: String, path: String, token: String) = MockHttpServletRequest(method, path).apply {
         addHeader(HttpHeaders.AUTHORIZATION, "Bearer $token")
     }
 }
