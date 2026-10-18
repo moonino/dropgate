@@ -1,6 +1,7 @@
 package dropgate.order
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -145,6 +146,103 @@ class SchemaConstraintTest {
             .contains("'PENDING'")
     }
 
+    @Test
+    fun `드롭은 허용된 전이를 따라 CLOSED까지 간다`() {
+        val dropId = insertDrop()
+
+        assertThatCode {
+            changeDropStatus(dropId, "OPEN")
+            changeDropStatus(dropId, "SOLD_OUT")
+            changeDropStatus(dropId, "CLOSED")
+        }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `SOLD_OUT 드롭은 OPEN으로 되돌릴 수 있다`() {
+        val dropId = insertDrop()
+        changeDropStatus(dropId, "OPEN")
+        changeDropStatus(dropId, "SOLD_OUT")
+
+        assertThatCode { changeDropStatus(dropId, "OPEN") }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `SCHEDULED 드롭은 SOLD_OUT으로 바로 갈 수 없다`() {
+        val dropId = insertDrop()
+
+        assertThatThrownBy { changeDropStatus(dropId, "SOLD_OUT") }.hasMessageContaining(FORBIDDEN_DROP_TRANSITION)
+    }
+
+    @Test
+    fun `CLOSED 드롭은 OPEN으로 되돌릴 수 없다`() {
+        val dropId = insertDrop()
+        changeDropStatus(dropId, "OPEN")
+        changeDropStatus(dropId, "CLOSED")
+
+        assertThatThrownBy { changeDropStatus(dropId, "OPEN") }.hasMessageContaining(FORBIDDEN_DROP_TRANSITION)
+    }
+
+    @Test
+    fun `OPEN 이후에는 총수량과 오픈 시각을 바꿀 수 없다`() {
+        val dropId = insertDrop()
+        changeDropStatus(dropId, "OPEN")
+
+        assertThatThrownBy { updateDrop(dropId, "total_quantity = 20") }.hasMessageContaining(FIXED_AFTER_OPEN)
+        assertThatThrownBy { updateDrop(dropId, "open_at = open_at - interval '1 minute'") }.hasMessageContaining(FIXED_AFTER_OPEN)
+    }
+
+    @Test
+    fun `드롭을 바꾸면 updated_at이 갱신된다`() {
+        val dropId = insertDrop()
+        val insertedAt = findDropUpdatedAt(dropId)
+
+        updateDrop(dropId, "name = 'renamed'")
+
+        assertThat(findDropUpdatedAt(dropId)).isAfter(insertedAt)
+    }
+
+    @Test
+    fun `CONFIRMED 주문은 취소 시각과 함께 CANCELED로 바꿀 수 있다`() {
+        val orderId = insertOrder(insertDrop())
+
+        assertThatCode { cancelOrder(orderId) }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `주문의 상태와 취소 시각 외 컬럼은 바꿀 수 없다`() {
+        val orderId = insertOrder(insertDrop())
+
+        assertThatThrownBy { updateOrder(orderId, "status = 'CANCELED', canceled_at = now(), user_id = gen_random_uuid()") }.hasMessageContaining(FORBIDDEN_ORDER_UPDATE)
+    }
+
+    @Test
+    fun `취소한 주문은 CONFIRMED로 되돌릴 수 없다`() {
+        val orderId = insertOrder(insertDrop())
+        cancelOrder(orderId)
+
+        assertThatThrownBy { updateOrder(orderId, "status = 'CONFIRMED', canceled_at = NULL") }.hasMessageContaining(FORBIDDEN_ORDER_UPDATE)
+    }
+
+    @Test
+    fun `주문은 삭제할 수 없다`() {
+        val orderId = insertOrder(insertDrop())
+
+        assertThatThrownBy { jdbc.sql("DELETE FROM orders.orders WHERE id = :id").param("id", orderId).update() }
+            .hasMessageContaining(FORBIDDEN_ORDER_DELETE)
+    }
+
+    @Test
+    fun `원장은 수정과 삭제와 TRUNCATE를 모두 거절한다`() {
+        val entryId = insertLedgerEntry()
+
+        assertThatThrownBy { jdbc.sql("UPDATE orders.order_ledger SET entry_type = 'CANCELED' WHERE id = :id").param("id", entryId).update() }
+            .hasMessageContaining(IMMUTABLE_LEDGER)
+        assertThatThrownBy { jdbc.sql("DELETE FROM orders.order_ledger WHERE id = :id").param("id", entryId).update() }
+            .hasMessageContaining(IMMUTABLE_LEDGER)
+        assertThatThrownBy { jdbc.sql("TRUNCATE orders.order_ledger").update() }
+            .hasMessageContaining(IMMUTABLE_LEDGER)
+    }
+
     private fun readOrdersIndexDefinitions(): Map<String, String> = jdbc.sql("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'orders'")
         .query { rs, _ -> rs.getString("indexname") to rs.getString("indexdef") }
         .list()
@@ -263,6 +361,36 @@ class SchemaConstraintTest {
             .update()
     }
 
+    private fun changeDropStatus(
+        dropId: UUID,
+        status: String,
+    ) {
+        jdbc.sql("UPDATE orders.drops SET status = :status WHERE id = :id").param("status", status).param("id", dropId).update()
+    }
+
+    private fun updateDrop(
+        dropId: UUID,
+        assignment: String,
+    ) {
+        jdbc.sql("UPDATE orders.drops SET $assignment WHERE id = :id").param("id", dropId).update()
+    }
+
+    private fun findDropUpdatedAt(dropId: UUID): OffsetDateTime = jdbc.sql("SELECT updated_at FROM orders.drops WHERE id = :id")
+        .param("id", dropId)
+        .query(OffsetDateTime::class.java)
+        .single()
+
+    private fun cancelOrder(orderId: UUID) {
+        updateOrder(orderId, "status = 'CANCELED', canceled_at = now()")
+    }
+
+    private fun updateOrder(
+        orderId: UUID,
+        assignment: String,
+    ) {
+        jdbc.sql("UPDATE orders.orders SET $assignment WHERE id = :id").param("id", orderId).update()
+    }
+
     companion object {
         private val OPEN_AT = OffsetDateTime.parse("2026-11-01T10:00:00Z")
         private val DESIGNED_INDEXES =
@@ -274,5 +402,10 @@ class SchemaConstraintTest {
                 "order_ledger_drop_occurred_idx",
                 "outbox_pending_idx",
             )
+        private const val FORBIDDEN_DROP_TRANSITION = "허용되지 않은 드롭 상태 전이"
+        private const val FIXED_AFTER_OPEN = "OPEN 이후에는 총수량과 오픈 시각을 바꿀 수 없습니다"
+        private const val FORBIDDEN_ORDER_UPDATE = "주문은 CONFIRMED에서 CANCELED로 바꾸는 것만 허용합니다"
+        private const val FORBIDDEN_ORDER_DELETE = "주문은 삭제할 수 없습니다"
+        private const val IMMUTABLE_LEDGER = "주문 원장은 바꾸거나 지울 수 없습니다"
     }
 }
