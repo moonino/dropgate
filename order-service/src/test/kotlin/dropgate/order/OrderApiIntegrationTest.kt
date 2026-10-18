@@ -44,6 +44,12 @@ abstract class OrderApiIntegrationTest : DropApiIntegrationTest() {
         return checkNotNull(body) { "구매 응답 본문이 없습니다" }.id
     }
 
+    fun cancel(orderId: UUID, userId: UUID): RestTestClient.ResponseSpec = cancelWithToken(orderId, tokens.issueAccessToken(userId))
+
+    fun cancelWithToken(orderId: UUID, token: String): RestTestClient.ResponseSpec = http.post().uri("/api/orders/$orderId/cancel")
+        .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+        .exchange()
+
     fun findRemainingQuantity(dropId: UUID): Int = jdbc.sql("SELECT remaining_quantity FROM orders.drops WHERE id = :id").param("id", dropId).query(Int::class.java).single()
 
     fun countRows(table: String): Long = jdbc.sql("SELECT count(*) FROM orders.$table").query(Long::class.java).single()
