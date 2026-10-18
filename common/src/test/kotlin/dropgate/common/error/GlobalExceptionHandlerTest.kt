@@ -48,8 +48,8 @@ class GlobalExceptionHandlerTest {
     @RestController
     private class FailingController {
         @GetMapping("/failures/{code}")
-        fun fail(@PathVariable("code") code: ErrorCode): Unit = throw DropgateException(code, "테스트 실패", fieldErrorsOf(code))
+        fun fail(@PathVariable("code") code: ErrorCode): Unit = throw DropgateException(code, "테스트 실패", createInvalidFieldsFor(code))
 
-        private fun fieldErrorsOf(code: ErrorCode) = if (code == ErrorCode.VALIDATION_FAILED) listOf(InvalidField("name", "이름은 100자 이하여야 합니다")) else emptyList()
+        private fun createInvalidFieldsFor(code: ErrorCode) = if (code == ErrorCode.VALIDATION_FAILED) listOf(InvalidField("name", "이름은 100자 이하여야 합니다")) else emptyList()
     }
 }
