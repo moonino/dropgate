@@ -6,6 +6,7 @@ dependencies {
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.flyway)
+    implementation(libs.spring.boot.starter.validation)
     implementation(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
     testImplementation(testFixtures(project(":common")))

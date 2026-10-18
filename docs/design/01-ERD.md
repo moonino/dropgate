@@ -119,7 +119,7 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 | created_at | timestamptz | NOT NULL, DEFAULT now() | |
 | updated_at | timestamptz | NOT NULL, DEFAULT now() | 트리거로 갱신 |
 
-허용 상태 전이: SCHEDULED -> OPEN, OPEN -> SOLD_OUT, OPEN -> CLOSED, SOLD_OUT -> CLOSED. 그 외는 트리거가 거절한다. total_quantity, open_at은 OPEN 이후 변경을 트리거가 거절한다.
+허용 상태 전이: SCHEDULED -> OPEN, OPEN -> SOLD_OUT, OPEN -> CLOSED, SOLD_OUT -> CLOSED, SOLD_OUT -> OPEN(취소로 재고가 돌아온 경우, ADR 0019). 그 외는 트리거가 거절한다. total_quantity, open_at은 OPEN 이후 변경을 트리거가 거절한다.
 
 인덱스: `drops_status_open_at_idx (status, open_at)`. 목록 조회가 status IN ('SCHEDULED','OPEN','SOLD_OUT') ORDER BY open_at이다.
 
@@ -217,7 +217,7 @@ BATCH_JOB_INSTANCE, BATCH_JOB_EXECUTION, BATCH_JOB_EXECUTION_PARAMS, BATCH_STEP_
 | orders.orders | orders_forbid_delete | DELETE 거절 |
 | orders.order_ledger | ledger_immutable | UPDATE, DELETE, TRUNCATE 거절 |
 
-제약과 트리거는 전부 SchemaConstraintTest로 고정한다(미터엔진 방식). 예상 테스트 수 12개.
+제약과 트리거는 전부 SchemaConstraintTest로 고정한다(미터엔진 방식).
 
 ## 합성 데이터
 
