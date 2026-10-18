@@ -60,13 +60,13 @@ rejected_logs=${#log_files[@]}
 review_rejected_logs=0
 top_cause=없음
 if [ "$rejected_logs" -gt 0 ]; then
-  review_rejected_logs=$(grep -h "날짜, 도구" "${log_files[@]}" | grep -c "자동 리뷰" || true)
+  review_rejected_logs=$(grep -h "날짜, 도구" "${log_files[@]}" | grep -c "자동 리뷰 지적" || true)
   top_cause=$( (grep -h "왜 틀렸나" "${log_files[@]}" || true) | cut -d'|' -f3 | cut -d'.' -f1 | sed 's/^ *//; s/ *$//' | sort | uniq -c | sort -rn | head -1 | sed 's/^ *[0-9]* //')
   top_cause=${top_cause:-없음}
 fi
 
-if [ "$rejected" -ne "$review_rejected_logs" ]; then
-  echo "경고: 기각 답글 ${rejected}건과 자동 리뷰 기각 일지 ${review_rejected_logs}건이 다르다" >&2
+if [ "$rejected" -gt "$review_rejected_logs" ]; then
+  echo "경고: 기각 답글 ${rejected}건보다 자동 리뷰 지적 기각 일지 ${review_rejected_logs}건이 적다" >&2
 fi
 
 pr_list=없음
