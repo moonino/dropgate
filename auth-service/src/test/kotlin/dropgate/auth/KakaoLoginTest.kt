@@ -10,10 +10,10 @@ import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
-import dropgate.auth.client.KakaoUnavailableException
 import dropgate.auth.configuration.JwtConfiguration
-import dropgate.auth.repository.InvalidStateException
 import dropgate.auth.repository.OAuthStateCookieRepository
+import dropgate.common.error.DropgateException
+import dropgate.common.error.ErrorCode
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -86,7 +86,9 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             "위변조" -> callback.cookies!!.single().value += "tampered"
             "누락" -> callback.setCookies()
         }
-        assertThatThrownBy { cookies.loadAuthorizationRequest(callback) }.isInstanceOf(InvalidStateException::class.java)
+        assertThatThrownBy { cookies.loadAuthorizationRequest(callback) }.isInstanceOfSatisfying(DropgateException::class.java) {
+            assertThat(it.errorCode).isEqualTo(ErrorCode.VALIDATION_FAILED)
+        }
     }
 
     @Test
@@ -109,7 +111,9 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             .withHeader("Content-Type", "application/json")
             .withFixedDelay(if (status == 200) 3500 else 0)
         wiremock.stubFor(WireMock.post("/oauth/token").willReturn(tokenResponse))
-        val failure = assertThatThrownBy { kakao.fetchUser("code") }.isInstanceOf(KakaoUnavailableException::class.java)
+        val failure = assertThatThrownBy { kakao.fetchUser("code") }.isInstanceOfSatisfying(DropgateException::class.java) {
+            assertThat(it.errorCode).isEqualTo(ErrorCode.KAKAO_UNAVAILABLE)
+        }
         if (status == 200) failure.hasRootCauseInstanceOf(SocketTimeoutException::class.java)
     }
 
@@ -280,6 +284,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             .expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
             .expectBody()
             .jsonPath("$.code").isEqualTo("VALIDATION_FAILED")
+            .jsonPath("$.message").isEqualTo(ErrorCode.VALIDATION_FAILED.message)
             .jsonPath("$.errors[0].field").isEqualTo("code")
         assertThat(wiremock.allServeEvents).isEmpty()
     }
@@ -310,6 +315,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             .exchange()
             .expectStatus().isBadRequest
             .expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED")
+            .jsonPath("$.message").isEqualTo(ErrorCode.VALIDATION_FAILED.message)
             .jsonPath("$.errors[0].field").isEqualTo("state")
         assertThat(wiremock.allServeEvents).isEmpty()
     }
@@ -327,6 +333,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             .expectHeader().valueMatches("Set-Cookie", ".*Max-Age=0.*")
             .expectBody()
             .jsonPath("$.code").isEqualTo("KAKAO_UNAVAILABLE")
+            .jsonPath("$.message").isEqualTo(ErrorCode.KAKAO_UNAVAILABLE.message)
             .jsonPath("$.errors").isArray
         assertThat(jdbc.sql("SELECT count(*) FROM auth.users").query(Long::class.java).single()).isZero()
     }
@@ -346,7 +353,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
 
     private fun assertUnauthenticated(response: RestTestClient.ResponseSpec) {
         response.expectStatus().isUnauthorized.expectBody().jsonPath("$.code").isEqualTo("UNAUTHENTICATED")
-            .jsonPath("$.message").isEqualTo("로그인이 필요합니다").jsonPath("$.errors").isEqualTo(emptyList<Any>())
+            .jsonPath("$.message").isEqualTo(ErrorCode.UNAUTHENTICATED.message).jsonPath("$.errors").isEqualTo(emptyList<Any>())
     }
 
     private fun signAccessToken(
