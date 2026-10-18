@@ -32,3 +32,5 @@ data class DropResponse(
         )
     }
 }
+
+data class DropPageResponse(val items: List<DropResponse>, val nextCursor: String?)
