@@ -34,7 +34,7 @@ const issueAccessToken = (role, issuedAtSeconds) => {
   return `${header}.${claims}.${signature}`;
 };
 
-const requestsOfUser = (userIndex) =>
+const countRequestsOfUser = (userIndex) =>
   userIndex % REPEATING_USER_INTERVAL === 0 ? REQUESTS_PER_REPEATING_USER : 1;
 
 const issuePurchaseRequestTokens = (requestCount, issuedAtSeconds) => {
@@ -43,7 +43,7 @@ const issuePurchaseRequestTokens = (requestCount, issuedAtSeconds) => {
   let fullyRepeatingUserCount = 0;
   for (let userIndex = 0; requestTokens.length < requestCount; userIndex += 1) {
     const userToken = issueAccessToken('USER', issuedAtSeconds);
-    const repeats = Math.min(requestsOfUser(userIndex), requestCount - requestTokens.length);
+    const repeats = Math.min(countRequestsOfUser(userIndex), requestCount - requestTokens.length);
     requestTokens.push(...Array(repeats).fill(userToken));
     userCount += 1;
     if (repeats === REQUESTS_PER_REPEATING_USER) {
