@@ -25,36 +25,36 @@ class GlobalExceptionHandlerInputTest {
 
     @Test
     fun `필수 쿼리 파라미터가 없으면 그 이름을 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/orders").andExpectValidationFailure("limit")
+        mvc.get("/inputs/orders").expectValidationFailure("limit")
     }
 
     @Test
     fun `경로 변수 형식이 맞지 않으면 그 이름을 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/drops/not-a-uuid").andExpectValidationFailure("dropId")
+        mvc.get("/inputs/drops/not-a-uuid").expectValidationFailure("dropId")
     }
 
     @Test
     fun `파라미터 제약을 어기면 제약 메시지를 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/orders?limit=0").andExpectValidationFailure("limit").andExpect {
+        mvc.get("/inputs/orders?limit=0").expectValidationFailure("limit").andExpect {
             jsonPath("$.errors[0].message") { value(LIMIT_TOO_SMALL_MESSAGE) }
         }
     }
 
     @Test
     fun `본문 필드 검증에 실패하면 필드와 제약 메시지를 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        postDrop("""{"name":"너무 긴 이름","quantity":1}""").andExpectValidationFailure("name").andExpect {
+        postDrop("""{"name":"너무 긴 이름","quantity":1}""").expectValidationFailure("name").andExpect {
             jsonPath("$.errors[0].message") { value(NAME_TOO_LONG_MESSAGE) }
         }
     }
 
     @Test
     fun `본문 필드 타입이 맞지 않으면 그 필드를 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        postDrop("""{"name":"한정판","quantity":"many"}""").andExpectValidationFailure("quantity")
+        postDrop("""{"name":"한정판","quantity":"many"}""").expectValidationFailure("quantity")
     }
 
     @Test
     fun `본문이 JSON이 아니면 body를 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        postDrop("{").andExpectValidationFailure("body")
+        postDrop("{").expectValidationFailure("body")
     }
 
     private fun postDrop(body: String): ResultActionsDsl = mvc.post("/inputs/drops") {
@@ -62,7 +62,7 @@ class GlobalExceptionHandlerInputTest {
         content = body
     }
 
-    private fun ResultActionsDsl.andExpectValidationFailure(field: String): ResultActionsDsl = andExpect {
+    private fun ResultActionsDsl.expectValidationFailure(field: String): ResultActionsDsl = andExpect {
         status { isBadRequest() }
         jsonPath("$.code") { value(ErrorCode.VALIDATION_FAILED.name) }
         jsonPath("$.message") { value(ErrorCode.VALIDATION_FAILED.message) }

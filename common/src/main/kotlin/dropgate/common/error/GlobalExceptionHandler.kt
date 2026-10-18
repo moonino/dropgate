@@ -30,7 +30,7 @@ class GlobalExceptionHandler {
     fun handleUnreadableBody(exception: HttpMessageNotReadableException): ResponseEntity<ErrorResponse> = rejectInput(listOf(FieldErrorResponse(readBodyPath(exception), INVALID_FORMAT_MESSAGE)))
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleInvalidBody(exception: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> = rejectInput(exception.bindingResult.allErrors.map { FieldErrorResponse(it.fieldOr(it.objectName), it.defaultMessage.orEmpty()) })
+    fun handleInvalidBody(exception: MethodArgumentNotValidException): ResponseEntity<ErrorResponse> = rejectInput(exception.bindingResult.allErrors.map { FieldErrorResponse(it.readFieldOr(it.objectName), it.defaultMessage.orEmpty()) })
 
     @ExceptionHandler(HandlerMethodValidationException::class)
     fun handleInvalidParameter(exception: HandlerMethodValidationException): ResponseEntity<ErrorResponse> = rejectInput(exception.parameterValidationResults.flatMap { it.toFieldErrorResponses() })
@@ -44,8 +44,8 @@ class GlobalExceptionHandler {
 
     private fun ParameterValidationResult.toFieldErrorResponses(): List<FieldErrorResponse> {
         val parameterName = methodParameter.parameterName ?: "arg${methodParameter.parameterIndex}"
-        return resolvableErrors.map { FieldErrorResponse(it.fieldOr(parameterName), it.defaultMessage.orEmpty()) }
+        return resolvableErrors.map { FieldErrorResponse(it.readFieldOr(parameterName), it.defaultMessage.orEmpty()) }
     }
 
-    private fun MessageSourceResolvable.fieldOr(fallback: String): String = if (this is FieldError) field else fallback
+    private fun MessageSourceResolvable.readFieldOr(fallback: String): String = if (this is FieldError) field else fallback
 }
