@@ -1,4 +1,4 @@
-import type { CreateDropRequest, Drop, Order, User } from "@/api/types";
+import type { Drop, Order, User } from "@/api/types";
 
 export const MOCK_USERS: Record<string, User> = {
   "mock-USER": { id: "0192f0a0-0000-7000-8000-000000000001", nickname: "모의 사용자", role: "USER" },
@@ -8,6 +8,8 @@ export const MOCK_USERS: Record<string, User> = {
 export type MockRejection = { status: number; code: string; message: string };
 
 export type MockResult<T> = { kind: "ok"; value: T } | { kind: "rejected"; rejection: MockRejection };
+
+export type NewDrop = Pick<Drop, "name" | "totalQuantity" | "admissionRatePerSec" | "openAt" | "closeAt">;
 
 type StoredOrder = Order & { userId: string };
 
@@ -32,16 +34,16 @@ export class MockStore {
     return drop ? { kind: "ok", value: this.advanceStatus(drop) } : reject(404, "DROP_NOT_FOUND", "드롭을 찾을 수 없습니다");
   }
 
-  createDrop(request: CreateDropRequest): Drop {
+  createDrop(newDrop: NewDrop): Drop {
     const drop: Drop = {
       id: this.nextId(),
-      name: request.name,
-      totalQuantity: request.totalQuantity,
-      openAt: request.openAt,
-      closeAt: request.closeAt,
+      name: newDrop.name,
+      totalQuantity: newDrop.totalQuantity,
+      openAt: newDrop.openAt,
+      closeAt: newDrop.closeAt,
       status: "SCHEDULED",
-      admissionRatePerSec: request.admissionRatePerSec ?? 50,
-      remainingQuantity: request.totalQuantity,
+      admissionRatePerSec: newDrop.admissionRatePerSec,
+      remainingQuantity: newDrop.totalQuantity,
     };
     this.drops.push(drop);
     return drop;

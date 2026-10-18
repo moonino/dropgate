@@ -9,6 +9,8 @@ const AUTH = "http://auth.test";
 const WEB = "http://localhost:3000";
 const STATE_COOKIE = "dropgate_oauth_state=signed; Path=/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax";
 const CLEARED_STATE_COOKIE = "dropgate_oauth_state=; Path=/auth; Max-Age=0; HttpOnly; Secure; SameSite=Lax";
+const TOKEN_PAIR = { accessToken: "access-token", refreshToken: "refresh-token", expiresIn: 900, tokenType: "Bearer" };
+const STATE_REJECTION = { code: "VALIDATION_FAILED", message: "로그인 state가 유효하지 않습니다", errors: [] };
 
 const server = setupServer();
 
@@ -66,18 +68,21 @@ describe("카카오 콜백 중계", () => {
     expect(forwarded).toEqual({ search: "?code=c&state=s", cookie: "dropgate_oauth_state=signed" });
   });
 
-  it("토큰 쌍을 httpOnly 쿠키에 담고 드롭 목록으로 302 보낸다", async () => {
-    server.use(
-      http.get(`${AUTH}/auth/callback/kakao`, () =>
-        HttpResponse.json({ accessToken: "access-token", refreshToken: "refresh-token", expiresIn: 900, tokenType: "Bearer" }),
-      ),
-    );
+  it("토큰 쌍을 받으면 드롭 목록으로 302 보낸다", async () => {
+    server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.json(TOKEN_PAIR)));
+
+    const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=s`));
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(`${WEB}/drops`);
+  });
+
+  it("토큰 쌍을 httpOnly 세션 쿠키에 담고 리프레시 쿠키는 /session 경로로 둔다", async () => {
+    server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.json(TOKEN_PAIR)));
 
     const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=s`));
     const cookies = response.headers.getSetCookie();
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe(`${WEB}/drops`);
     expect(cookies.find((cookie) => cookie.startsWith("dropgate_access=access-token"))).toMatch(/HttpOnly/i);
     expect(cookies.find((cookie) => cookie.startsWith("dropgate_refresh=refresh-token"))).toMatch(/Path=\/session/);
   });
@@ -110,15 +115,18 @@ describe("카카오 콜백 중계", () => {
   });
 
   it("auth-service가 거절하면 오류 code를 들고 로그인 화면으로 보낸다", async () => {
-    server.use(
-      http.get(`${AUTH}/auth/callback/kakao`, () =>
-        HttpResponse.json({ code: "VALIDATION_FAILED", message: "로그인 state가 유효하지 않습니다", errors: [] }, { status: 400 }),
-      ),
-    );
+    server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.json(STATE_REJECTION, { status: 400 })));
 
     const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=forged`));
 
     expect(response.headers.get("Location")).toBe(`${WEB}/login?error=VALIDATION_FAILED`);
+  });
+
+  it("auth-service가 거절하면 세션 쿠키를 쓰지 않는다", async () => {
+    server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.json(STATE_REJECTION, { status: 400 })));
+
+    const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=forged`));
+
     expect(response.headers.getSetCookie().some((cookie) => cookie.startsWith("dropgate_access="))).toBe(false);
   });
 

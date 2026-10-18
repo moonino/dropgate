@@ -1,9 +1,10 @@
 import { http, HttpResponse, type HttpHandler } from "msw";
 import type { CreateDropRequest, FieldError, User } from "@/api/types";
 import { readMockBaseUrl } from "../config";
-import { MOCK_USERS, type MockRejection, type MockResult, type MockStore } from "./mock-store";
+import { MOCK_USERS, type MockRejection, type MockResult, type MockStore, type NewDrop } from "./mock-store";
 
 const DEFAULT_PAGE_LIMIT = 20;
+const DEFAULT_ADMISSION_RATE = 50;
 const MAX_NAME_LENGTH = 100;
 const MAX_ADMISSION_RATE = 10_000;
 
@@ -11,26 +12,26 @@ export function createMockHandlers(store: MockStore): HttpHandler[] {
   const auth = readMockBaseUrl("auth");
   const order = readMockBaseUrl("order");
   return [
-    http.get(`${auth}/auth/me`, ({ request }) => withUser(request, (user) => HttpResponse.json(user))),
+    http.get(`${auth}/auth/me`, ({ request }) => respondAsUser(request, (user) => HttpResponse.json(user))),
     http.get(`${order}/api/drops`, ({ request }) => HttpResponse.json(paginate(store.listDrops(), new URL(request.url)))),
     http.get(`${order}/api/drops/:dropId`, ({ params }) => respond(store.getDrop(String(params.dropId)))),
     http.post(`${order}/api/drops/:dropId/orders`, ({ request, params }) =>
-      withUser(request, (user) => respond(store.purchase(String(params.dropId), user), 201)),
+      respondAsUser(request, (user) => respond(store.purchase(String(params.dropId), user), 201)),
     ),
     http.post(`${order}/api/orders/:orderId/cancel`, ({ request, params }) =>
-      withUser(request, (user) => respond(store.cancel(String(params.orderId), user))),
+      respondAsUser(request, (user) => respond(store.cancel(String(params.orderId), user))),
     ),
     http.get(`${order}/api/orders/me`, ({ request }) =>
-      withUser(request, (user) => HttpResponse.json(paginate(store.listOrders(user), new URL(request.url)))),
+      respondAsUser(request, (user) => HttpResponse.json(paginate(store.listOrders(user), new URL(request.url)))),
     ),
     http.post(`${order}/api/admin/drops`, async ({ request }) => {
       const found = readUser(request);
-      if (found.kind === "rejected") return rejection(found.rejection);
-      if (found.value.role !== "ADMIN") return rejection({ status: 403, code: "FORBIDDEN", message: "관리자만 할 수 있습니다" });
+      if (found.kind === "rejected") return respondWithRejection(found.rejection);
+      if (found.value.role !== "ADMIN") return respondWithRejection({ status: 403, code: "FORBIDDEN", message: "관리자만 할 수 있습니다" });
       const body = (await request.json()) as CreateDropRequest;
       const errors = validateDrop(body);
       if (errors.length > 0) return HttpResponse.json({ code: "VALIDATION_FAILED", message: "입력값을 확인해 주세요", errors }, { status: 400 });
-      return HttpResponse.json(store.createDrop(body), { status: 201 });
+      return HttpResponse.json(store.createDrop(toNewDrop(body)), { status: 201 });
     }),
   ];
 }
@@ -41,16 +42,16 @@ function readUser(request: Request): MockResult<User> {
   return user ? { kind: "ok", value: user } : { kind: "rejected", rejection: { status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다" } };
 }
 
-function withUser(request: Request, handle: (user: User) => Response): Response {
+function respondAsUser(request: Request, handle: (user: User) => Response): Response {
   const found = readUser(request);
-  return found.kind === "ok" ? handle(found.value) : rejection(found.rejection);
+  return found.kind === "ok" ? handle(found.value) : respondWithRejection(found.rejection);
 }
 
 function respond<T>(result: MockResult<T>, successStatus = 200): Response {
-  return result.kind === "ok" ? HttpResponse.json(result.value as object, { status: successStatus }) : rejection(result.rejection);
+  return result.kind === "ok" ? HttpResponse.json(result.value as object, { status: successStatus }) : respondWithRejection(result.rejection);
 }
 
-function rejection({ status, code, message }: MockRejection): Response {
+function respondWithRejection({ status, code, message }: MockRejection): Response {
   return HttpResponse.json({ code, message, errors: [] }, { status });
 }
 
@@ -61,6 +62,16 @@ function paginate<T extends { id: string }>(items: T[], url: URL): { items: T[];
   const page = items.slice(start, start + limit);
   const hasMore = start + limit < items.length;
   return { items: page, nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null };
+}
+
+function toNewDrop(body: CreateDropRequest): NewDrop {
+  return {
+    name: body.name,
+    totalQuantity: body.totalQuantity,
+    admissionRatePerSec: body.admissionRatePerSec ?? DEFAULT_ADMISSION_RATE,
+    openAt: body.openAt,
+    closeAt: body.closeAt,
+  };
 }
 
 function validateDrop(body: CreateDropRequest): FieldError[] {
