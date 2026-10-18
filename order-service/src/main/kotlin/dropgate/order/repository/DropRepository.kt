@@ -52,4 +52,15 @@ interface DropRepository : JpaRepository<DropEntity, UUID> {
     @Modifying
     @Query("UPDATE DropEntity d SET d.status = $DROP_STATUS.SOLD_OUT WHERE d.id = :id AND d.status = $DROP_STATUS.OPEN AND d.remainingQuantity = 0")
     fun markSoldOutIfExhausted(@Param("id") id: UUID)
+
+    @Modifying
+    @Query(
+        value = """
+        UPDATE orders.drops
+        SET remaining_quantity = remaining_quantity + 1, status = CASE WHEN status = 'SOLD_OUT' THEN 'OPEN' ELSE status END
+        WHERE id = :id
+    """,
+        nativeQuery = true,
+    )
+    fun restoreOneUnitAndReopen(@Param("id") id: UUID)
 }
