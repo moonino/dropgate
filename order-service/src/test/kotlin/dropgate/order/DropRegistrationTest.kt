@@ -2,7 +2,6 @@ package dropgate.order
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpHeaders
 import java.util.UUID
 
 class DropRegistrationTest : DropApiIntegrationTest() {
@@ -10,10 +9,9 @@ class DropRegistrationTest : DropApiIntegrationTest() {
     fun `ADMIN이 드롭을 등록하면 201과 등록한 드롭을 가리키는 Location을 돌려준다`() {
         val response = postDrop(VALID_BODY, issueAdminToken())
             .expectStatus().isCreated
-            .expectHeader().valueMatches(HttpHeaders.LOCATION, "/api/drops/[0-9a-f-]{36}")
             .expectBody().returnResult()
 
-        assertThat(response.responseHeaders.location.toString()).endsWith(readJsonId(response.responseBodyContent))
+        assertThat(response.responseHeaders.location.toString()).isEqualTo("/api/drops/${readJsonId(response.responseBodyContent)}")
     }
 
     @Test
@@ -24,8 +22,18 @@ class DropRegistrationTest : DropApiIntegrationTest() {
             .jsonPath("$.openAt").isEqualTo("2030-11-01T10:00:00.000Z")
             .jsonPath("$.closeAt").isEqualTo("2030-11-01T11:00:00.000Z")
             .jsonPath("$.status").isEqualTo("SCHEDULED")
-            .jsonPath("$.admissionRatePerSec").isEqualTo(50)
-            .jsonPath("$.remainingQuantity").isEmpty
+    }
+
+    @Test
+    fun `입장 속도를 주지 않으면 50으로 등록한다`() {
+        postDrop(VALID_BODY, issueAdminToken()).expectStatus().isCreated
+            .expectBody().jsonPath("$.admissionRatePerSec").isEqualTo(50)
+    }
+
+    @Test
+    fun `등록 응답은 남은 수량을 숨긴다`() {
+        postDrop(VALID_BODY, issueAdminToken()).expectStatus().isCreated
+            .expectBody().jsonPath("$.remainingQuantity").isEmpty
     }
 
     @Test
