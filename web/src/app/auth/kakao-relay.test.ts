@@ -9,6 +9,7 @@ const AUTH = "http://auth.test";
 const WEB = "http://localhost:3000";
 const STATE_COOKIE = "dropgate_oauth_state=signed; Path=/auth; Max-Age=600; HttpOnly; Secure; SameSite=Lax";
 const CLEARED_STATE_COOKIE = "dropgate_oauth_state=; Path=/auth; Max-Age=0; HttpOnly; Secure; SameSite=Lax";
+const KAKAO_REDIRECT = { status: 302, headers: { Location: "https://kauth.kakao.com/oauth/authorize?state=s", "Set-Cookie": STATE_COOKIE } };
 const TOKEN_PAIR = { accessToken: "access-token", refreshToken: "refresh-token", expiresIn: 900, tokenType: "Bearer" };
 const STATE_REJECTION = { code: "VALIDATION_FAILED", message: "로그인 state가 유효하지 않습니다", errors: [] };
 
@@ -22,17 +23,20 @@ beforeEach(() => {
 });
 
 describe("카카오 로그인 시작 중계", () => {
-  it("auth-service의 카카오 리다이렉트와 state 쿠키를 그대로 돌려준다", async () => {
-    server.use(
-      http.get(`${AUTH}/auth/login/kakao`, () =>
-        new HttpResponse(null, { status: 302, headers: { Location: "https://kauth.kakao.com/oauth/authorize?state=s", "Set-Cookie": STATE_COOKIE } }),
-      ),
-    );
+  it("auth-service의 카카오 리다이렉트를 그대로 돌려준다", async () => {
+    server.use(http.get(`${AUTH}/auth/login/kakao`, () => new HttpResponse(null, KAKAO_REDIRECT)));
 
     const response = await startLogin(new NextRequest(`${WEB}/auth/login/kakao`));
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("https://kauth.kakao.com/oauth/authorize?state=s");
+    expect(response.headers.get("Location")).toBe(KAKAO_REDIRECT.headers.Location);
+  });
+
+  it("auth-service가 만든 state 쿠키를 그대로 돌려준다", async () => {
+    server.use(http.get(`${AUTH}/auth/login/kakao`, () => new HttpResponse(null, KAKAO_REDIRECT)));
+
+    const response = await startLogin(new NextRequest(`${WEB}/auth/login/kakao`));
+
     expect(response.headers.getSetCookie()).toContain(STATE_COOKIE);
   });
 
@@ -77,14 +81,20 @@ describe("카카오 콜백 중계", () => {
     expect(response.headers.get("Location")).toBe(`${WEB}/drops`);
   });
 
-  it("토큰 쌍을 httpOnly 세션 쿠키에 담고 리프레시 쿠키는 /session 경로로 둔다", async () => {
+  it("액세스 토큰을 httpOnly 쿠키에 담는다", async () => {
     server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.json(TOKEN_PAIR)));
 
     const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=s`));
-    const cookies = response.headers.getSetCookie();
 
-    expect(cookies.find((cookie) => cookie.startsWith("dropgate_access=access-token"))).toMatch(/HttpOnly/i);
-    expect(cookies.find((cookie) => cookie.startsWith("dropgate_refresh=refresh-token"))).toMatch(/Path=\/session/);
+    expect(response.headers.getSetCookie().find((cookie) => cookie.startsWith("dropgate_access=access-token"))).toMatch(/HttpOnly/i);
+  });
+
+  it("리프레시 토큰 쿠키는 /session 경로에만 둔다", async () => {
+    server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.json(TOKEN_PAIR)));
+
+    const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=s`));
+
+    expect(response.headers.getSetCookie().find((cookie) => cookie.startsWith("dropgate_refresh=refresh-token"))).toMatch(/Path=\/session/);
   });
 
   it("세션 쿠키를 쓴 뒤에도 auth-service의 state 쿠키 삭제 헤더를 그대로 돌려준다", async () => {

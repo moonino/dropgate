@@ -18,11 +18,17 @@ describe("MockStore", () => {
     expect(store.purchase(dropId, buyer)).toMatchObject({ kind: "rejected", rejection: { status: 409, code: "ALREADY_PURCHASED" } });
   });
 
-  it("마지막 재고를 팔면 SOLD_OUT으로 바뀌고 다음 구매를 거절한다", () => {
+  it("마지막 재고를 팔면 SOLD_OUT으로 바뀐다", () => {
     const { store, dropId } = openStoreWith(1);
     store.purchase(dropId, buyer);
 
     expect(store.getDrop(dropId)).toMatchObject({ value: { status: "SOLD_OUT", remainingQuantity: 0 } });
+  });
+
+  it("재고가 없으면 다음 구매를 SOLD_OUT으로 거절한다", () => {
+    const { store, dropId } = openStoreWith(1);
+    store.purchase(dropId, buyer);
+
     expect(store.purchase(dropId, admin)).toMatchObject({ rejection: { code: "SOLD_OUT" } });
   });
 

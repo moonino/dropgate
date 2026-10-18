@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { DropFormState } from "@/app/admin/drops/new/actions";
@@ -12,15 +12,24 @@ function rejectWith(overrides: Partial<Extract<DropFormState, { kind: "rejected"
   return vi.fn().mockResolvedValue({ kind: "rejected", message: "입력값을 확인해 주세요", fieldErrors: [], retryAfterSeconds: undefined, values: SUBMITTED_VALUES, ...overrides });
 }
 
+const CLOSE_AT_ERROR = { field: "closeAt", message: "마감 시각은 오픈 시각보다 늦어야 합니다" };
+
+async function submitWith(fieldError: typeof CLOSE_AT_ERROR): Promise<void> {
+  render(<DropForm action={rejectWith({ fieldErrors: [fieldError] })} />);
+  await userEvent.click(screen.getByRole("button", { name: "드롭 등록" }));
+}
+
 describe("DropForm", () => {
-  it("서버의 필드 오류를 해당 입력란 아래에 붙이고 입력란을 오류로 표시한다", async () => {
-    render(<DropForm action={rejectWith({ fieldErrors: [{ field: "closeAt", message: "마감 시각은 오픈 시각보다 늦어야 합니다" }] })} />);
+  it("서버의 필드 오류를 해당 입력란 아래 설명으로 붙인다", async () => {
+    await submitWith(CLOSE_AT_ERROR);
 
-    await userEvent.click(screen.getByRole("button", { name: "드롭 등록" }));
+    await waitFor(() => expect(screen.getByLabelText("마감 시각")).toHaveAccessibleDescription(CLOSE_AT_ERROR.message));
+  });
 
-    const closeAt = await screen.findByLabelText("마감 시각");
-    expect(closeAt).toHaveAttribute("aria-invalid", "true");
-    expect(closeAt).toHaveAccessibleDescription("마감 시각은 오픈 시각보다 늦어야 합니다");
+  it("서버가 필드 오류를 준 입력란을 오류로 표시한다", async () => {
+    await submitWith(CLOSE_AT_ERROR);
+
+    await waitFor(() => expect(screen.getByLabelText("마감 시각")).toHaveAttribute("aria-invalid", "true"));
   });
 
   it("서버 message를 폼 위 경고로 보여 준다", async () => {
@@ -49,10 +58,15 @@ describe("DropForm", () => {
     expect(screen.getByLabelText("이름")).toHaveValue(SUBMITTED_VALUES.name);
   });
 
-  it("오류가 없는 입력란은 안내 문구만 둔다", () => {
+  it("오류가 없는 입력란은 오류로 표시하지 않는다", () => {
     render(<DropForm action={vi.fn()} />);
 
     expect(screen.getByLabelText("초당 입장 인원")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("오류가 없는 입력란은 안내 문구를 설명으로 둔다", () => {
+    render(<DropForm action={vi.fn()} />);
+
     expect(screen.getByLabelText("초당 입장 인원")).toHaveAccessibleDescription("1에서 10000, 기본 50");
   });
 });

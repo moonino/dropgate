@@ -12,9 +12,13 @@ describe("formatStock", () => {
 });
 
 describe("DROP_STATUS_BADGES", () => {
-  it("상태마다 문구와 모양이 모두 다르다", () => {
+  it("상태마다 문구가 다르다", () => {
     const badges = Object.values(DROP_STATUS_BADGES);
     expect(new Set(badges.map((badge) => badge.label)).size).toBe(badges.length);
+  });
+
+  it("상태마다 모양이 다르다", () => {
+    const badges = Object.values(DROP_STATUS_BADGES);
     expect(new Set(badges.map((badge) => badge.tone)).size).toBe(badges.length);
   });
 });
