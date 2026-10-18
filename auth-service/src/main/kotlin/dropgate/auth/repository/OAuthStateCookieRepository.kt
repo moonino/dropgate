@@ -1,6 +1,9 @@
 package dropgate.auth.repository
 
 import dropgate.auth.client.KakaoClient
+import dropgate.common.error.DropgateException
+import dropgate.common.error.ErrorCode
+import dropgate.common.error.InvalidField
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
@@ -42,9 +45,9 @@ class OAuthStateCookieRepository(
             !MessageDigest.isEqual(sign("${parts[0]}.${parts[1]}").toByteArray(), parts[2].toByteArray()) ||
             (parts[1].toLongOrNull() ?: 0) <= clock.instant().epochSecond ||
             parts[0].isBlank() ||
-            parts[0] != request.getParameter("state")
+            parts[0] != request.getParameter(STATE_PARAMETER)
         ) {
-            throw InvalidStateException()
+            throw DropgateException(ErrorCode.VALIDATION_FAILED, INVALID_STATE_MESSAGE, listOf(InvalidField(STATE_PARAMETER, INVALID_STATE_MESSAGE)))
         }
         return kakao.createAuthorizationRequest(parts[0])
     }
@@ -70,9 +73,9 @@ class OAuthStateCookieRepository(
 
     companion object {
         private const val COOKIE_NAME = "dropgate_oauth_state"
+        private const val STATE_PARAMETER = "state"
+        private const val INVALID_STATE_MESSAGE = "로그인 state가 유효하지 않습니다"
         private const val STATE_BYTES = 32
         private val COOKIE_TTL = Duration.ofMinutes(10)
     }
 }
-
-class InvalidStateException : RuntimeException("로그인 state가 유효하지 않습니다")
