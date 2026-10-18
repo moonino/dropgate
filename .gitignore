@@ -19,6 +19,11 @@ replay_pid*
 *.log
 logs/
 node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+web/AGENTS.md
+web/CLAUDE.md
 
 # secrets and local config
 .env
@@ -47,7 +52,7 @@ shared-local-instance.db
 pgdata/
 
 # load test output (measurements go to docs/measurements as tables)
-k6/results/
+**/k6/results/
 *.k6.json
 
 # Terraform, Kubernetes, Helm
