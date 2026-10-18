@@ -1,6 +1,19 @@
 spring:
   application:
     name: order-service
+  datasource:
+    url: ${DROPGATE_DB_URL}
+    username: order_user
+    password: ${DROPGATE_DB_ORDER_PASSWORD}
+  flyway:
+    schemas: orders
+  jpa:
+    hibernate:
+      ddl-auto: validate
 
 server:
   port: 8082
+
+dropgate:
+  auth:
+    jwks-uri: ${DROPGATE_AUTH_JWKS_URI}
