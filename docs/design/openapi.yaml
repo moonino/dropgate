@@ -270,12 +270,14 @@ paths:
     get:
       tags: [drops]
       summary: 드롭 목록(SCHEDULED, OPEN, SOLD_OUT), openAt 순, 커서 페이징
+      description: openAt이 같으면 id 순이다. cursor는 앞 페이지의 nextCursor를 그대로 넘기는 불투명 문자열이다. 읽을 수 없거나 저장할 수 없는 시각을 담은 cursor는 400이고 errors의 field는 cursor다.
       security: []
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
       responses:
         '200': { description: 목록, content: { application/json: { schema: { $ref: '#/components/schemas/DropPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /api/drops/{dropId}:
     get:
       tags: [drops]
@@ -328,37 +330,43 @@ paths:
     post:
       tags: [orders]
       summary: 구매. 입장 상태여야 하고 1인 1개
+      description: 1주 차 DB만 경로(ADR 0005)는 입장 확인을 건너뛰고, 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다. 마지막 재고를 팔면 드롭은 SOLD_OUT이 된다.
       security: [ { bearer: [] } ]
       parameters:
         - { name: dropId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        '201': { description: 주문 확정, headers: { Location: { schema: { type: string } } }, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '201': { description: 주문 확정, headers: { Location: { schema: { type: string }, description: "/api/orders/{orderId}" } }, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: code NOT_ADMITTED, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: "code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED. Lua 반환 순서", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '409': { description: "code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED. Lua 반환 순서. DB만 경로는 DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED 순", content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '503': { $ref: '#/components/responses/Unavailable' }
   /api/orders/me:
     get:
       tags: [orders]
       summary: 내 주문, 최신순 커서 페이징
+      description: confirmedAt 내림차순이고 같으면 id 내림차순이다. 취소한 주문도 포함한다. cursor는 앞 페이지의 nextCursor를 그대로 넘기는 불투명 문자열이다. 읽을 수 없거나 저장할 수 없는 시각을 담은 cursor는 400이고 errors의 field는 cursor다.
       security: [ { bearer: [] } ]
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
       responses:
         '200': { description: 목록, content: { application/json: { schema: { $ref: '#/components/schemas/OrderPage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /api/orders/{orderId}/cancel:
     post:
       tags: [orders]
       summary: 주문 취소. 본인 주문, 드롭 마감 전, CONFIRMED만
+      description: 검사 순서는 ORDER_NOT_FOUND, FORBIDDEN(남의 주문), ORDER_ALREADY_CANCELED, DROP_CLOSED다. 취소한 재고는 되돌리고 SOLD_OUT 드롭은 OPEN으로 돌아간다(ADR 0019). 취소한 사용자는 같은 드롭을 다시 살 수 없다.
       security: [ { bearer: [] } ]
       parameters:
         - { name: orderId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
         '200': { description: 취소됨, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

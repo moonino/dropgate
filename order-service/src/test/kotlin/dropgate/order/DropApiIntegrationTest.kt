@@ -68,6 +68,8 @@ abstract class DropApiIntegrationTest {
         return id
     }
 
+    fun findDropStatus(id: UUID): String = jdbc.sql("SELECT status FROM orders.drops WHERE id = :id").param("id", id).query(String::class.java).single()
+
     companion object {
         private const val JWKS_PATH = "/.well-known/jwks.json"
         val OPEN_AT: Instant = Instant.parse("2030-11-01T10:00:00Z")

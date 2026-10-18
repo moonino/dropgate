@@ -33,4 +33,16 @@ class DropService(private val drops: DropRepository, private val identifiers: Uu
         val drop = drops.findById(id).orElseThrow { DropgateException(ErrorCode.DROP_NOT_FOUND, "드롭이 없습니다: $id") }
         return DropResponse.createWithoutStock(drop)
     }
+
+    @Transactional(readOnly = true)
+    fun getFirstDrops(limit: Int): DropPageResponse = toPage(drops.findListedDrops(limit + 1), limit)
+
+    @Transactional(readOnly = true)
+    fun getDropsAfter(cursor: DropCursor, limit: Int): DropPageResponse = toPage(drops.findListedDropsAfter(cursor.openAt, cursor.id, limit + 1), limit)
+
+    private fun toPage(fetched: List<DropEntity>, limit: Int): DropPageResponse {
+        val items = fetched.take(limit)
+        val nextCursor = if (fetched.size > limit) DropCursor(items.last().openAt, items.last().id).encode() else null
+        return DropPageResponse(items.map(DropResponse::createWithoutStock), nextCursor)
+    }
 }
