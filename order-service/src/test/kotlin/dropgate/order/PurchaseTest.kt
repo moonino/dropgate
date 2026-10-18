@@ -80,6 +80,24 @@ class PurchaseTest : OrderApiIntegrationTest() {
     }
 
     @Test
+    fun `마지막 재고를 사면 드롭이 SOLD_OUT이 된다`() {
+        val dropId = insertDropWithStock(totalQuantity = 1)
+
+        purchase(dropId, UUID.randomUUID()).expectStatus().isCreated
+
+        assertThat(findDropStatus(dropId)).isEqualTo("SOLD_OUT")
+    }
+
+    @Test
+    fun `재고가 남아 있으면 드롭은 OPEN 그대로다`() {
+        val dropId = insertDropWithStock(totalQuantity = 2)
+
+        purchase(dropId, UUID.randomUUID()).expectStatus().isCreated
+
+        assertThat(findDropStatus(dropId)).isEqualTo("OPEN")
+    }
+
+    @Test
     fun `남은 수량이 0인 OPEN 드롭은 409 SOLD_OUT을 돌려준다`() {
         val dropId = insertDropWithStock(totalQuantity = 1, remainingQuantity = 0)
 

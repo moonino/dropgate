@@ -103,9 +103,12 @@ Kafka 대신 Redis Streams를 쓴다. Redis가 이미 있어 스택이 늘지 �
 - 측정: 2절 LLM 행 4개. 도구 선택 정확도, 분류 정확도, 주입 차단 수, USER 토큰 거절 수
 - 8주 차에 밀린 것이 남아 있으면 9주와 10주를 그쪽에 쓰고 ops-assistant는 뺀다
 
+### 웹 트랙 (2주 차부터 백엔드와 나란히)
+측정 대상 기술은 아니다. 사용자 흐름을 화면으로 보여 주는 Next.js BFF를 `web/`에 둔다(설계 docs/design/10-웹-프론트.md, ADR 0020). 2주 차에 시작하고 화면별 주차는 10 문서 5절을 따른다. 6주 차 kind 배포에 Deployment 하나를 더한다. 밀리면 축소 순서에서 ops-assistant보다 먼저 뺀다.
+
 ## 4. ADR 목록
 
-0001 Kotlin, 0002 서비스 셋으로 나눈 이유와 경계, 0003 인증 방식, 0004 배포 경로(kind 먼저 EKS 나중), 0005 DB만으로 먼저, 0006 Redis 전체 장애 정책(막기), 0007 Lua 대 분산 락, 0008 outbox 대 직접 발행과 Streams 대 Kafka, 0009 접속 대기열 설계, 0010 Sentinel과 절체 중 정합성, 0011 DynamoDB 대 PostgreSQL JSONB, 0012 멱등 소비와 DLQ, 0013 청크 크기와 재시작, 0014 프로브와 종료 유예, 0015 EKS 대 ECS, 0016 결과와 한계, 0017 LLM 도구 호출 경계와 숫자 원칙(넷째 서비스, 읽기 전용, 계산은 도구만), 0018 JWKS 조회 실패는 503 AUTH_UNAVAILABLE. 0002 경계 규칙(스키마 교차 읽기, 동기 호출)과의 관계와 0002를 superseded로 바꿀지는 설계 문서 09와 ADR 0017에서 정한다. 번복은 지우지 않고 superseded로 남긴다.
+0001 Kotlin, 0002 서비스 셋으로 나눈 이유와 경계, 0003 인증 방식, 0004 배포 경로(kind 먼저 EKS 나중), 0005 DB만으로 먼저, 0006 Redis 전체 장애 정책(막기), 0007 Lua 대 분산 락, 0008 outbox 대 직접 발행과 Streams 대 Kafka, 0009 접속 대기열 설계, 0010 Sentinel과 절체 중 정합성, 0011 DynamoDB 대 PostgreSQL JSONB, 0012 멱등 소비와 DLQ, 0013 청크 크기와 재시작, 0014 프로브와 종료 유예, 0015 EKS 대 ECS, 0016 결과와 한계, 0017 LLM 도구 호출 경계와 숫자 원칙(넷째 서비스, 읽기 전용, 계산은 도구만), 0018 JWKS 조회 실패는 503 AUTH_UNAVAILABLE, 0019 DB만 경로의 취소는 같은 트랜잭션에서 재고를 되돌린다(SOLD_OUT -> OPEN 허용), 0020 웹 프론트는 같은 레포의 Next.js BFF로 둔다. 0002 경계 규칙(스키마 교차 읽기, 동기 호출)과의 관계와 0002를 superseded로 바꿀지는 설계 문서 09와 ADR 0017에서 정한다. 번복은 지우지 않고 superseded로 남긴다.
 
 ## 5. 비용 (추정)
 
@@ -113,7 +116,7 @@ Kafka 대신 Redis Streams를 쓴다. Redis가 이미 있어 스택이 늘지 �
 
 ## 6. 축소 순서
 
-ops-assistant 생략 -> 인증 서비스를 주문 서비스에 합침 -> DynamoDB를 PostgreSQL JSONB로 -> 대조 배치 생략 -> Sentinel을 단일 Redis로 -> EKS를 빼고 kind 결과로 마무리. 끝까지 두는 것: Kotlin, 대기열과 재고 정확도, 비동기 경계 하나, 배치 재시작, kind 파드 3개 실험, 테스트, CI, 측정 표, ADR.
+웹 화면 생략 -> ops-assistant 생략 -> 인증 서비스를 주문 서비스에 합침 -> DynamoDB를 PostgreSQL JSONB로 -> 대조 배치 생략 -> Sentinel을 단일 Redis로 -> EKS를 빼고 kind 결과로 마무리. 끝까지 두는 것: Kotlin, 대기열과 재고 정확도, 비동기 경계 하나, 배치 재시작, kind 파드 3개 실험, 테스트, CI, 측정 표, ADR.
 
 ## 7. 규칙
 
