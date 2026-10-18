@@ -36,7 +36,7 @@ export class MockStore {
 
   createDrop(newDrop: NewDrop): Drop {
     const drop: Drop = {
-      id: this.nextId(),
+      id: this.createNextId(),
       name: newDrop.name,
       totalQuantity: newDrop.totalQuantity,
       openAt: newDrop.openAt,
@@ -71,7 +71,7 @@ export class MockStore {
     drop.remainingQuantity = (drop.remainingQuantity ?? 0) - 1;
     if (drop.remainingQuantity === 0) drop.status = "SOLD_OUT";
     const order: StoredOrder = {
-      id: this.nextId(),
+      id: this.createNextId(),
       dropId,
       dropName: drop.name,
       quantity: 1,
@@ -113,7 +113,7 @@ export class MockStore {
     return drop;
   }
 
-  private nextId(): string {
+  private createNextId(): string {
     this.sequence += 1;
     return `0192f0a0-0000-7000-8000-${String(this.sequence).padStart(12, "0")}`;
   }

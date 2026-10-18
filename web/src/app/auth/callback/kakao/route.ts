@@ -17,7 +17,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return redirectToAuthUnavailable(error, request);
   }
   if (!upstream.ok) {
-    const error = await BackendError.fromResponse(upstream);
+    const error = await BackendError.createFrom(upstream);
     const failed = redirectFound(createLoginErrorPath(error.code, error.retryAfterSeconds), request);
     forwardSetCookies(upstream, failed);
     return failed;

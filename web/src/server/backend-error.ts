@@ -16,12 +16,12 @@ export class BackendError extends Error {
     this.name = "BackendError";
   }
 
-  static async fromResponse(response: Response): Promise<BackendError> {
+  static async createFrom(response: Response): Promise<BackendError> {
     const body = await readErrorBody(response);
     return new BackendError(response.status, body.code, body.message, body.errors ?? [], parseRetryAfterSeconds(response.headers.get("Retry-After")));
   }
 
-  static unreachable(): BackendError {
+  static createUnreachable(): BackendError {
     return new BackendError(SERVICE_UNAVAILABLE, UNREACHABLE_ERROR.code, UNREACHABLE_ERROR.message, [], undefined);
   }
 

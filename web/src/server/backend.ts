@@ -11,7 +11,7 @@ export type BackendRequest = {
 
 export async function callBackend<T>(service: BackendService, path: string, request: BackendRequest = {}): Promise<T> {
   const response = await sendBackendRequest(service, path, request);
-  if (!response.ok) throw await BackendError.fromResponse(response);
+  if (!response.ok) throw await BackendError.createFrom(response);
   return (await response.json()) as T;
 }
 
@@ -39,7 +39,7 @@ async function fetchOrUnreachable(outgoing: Request): Promise<Response> {
   try {
     return await fetch(outgoing, { cache: "no-store" });
   } catch (error) {
-    if (error instanceof TypeError) throw BackendError.unreachable();
+    if (error instanceof TypeError) throw BackendError.createUnreachable();
     throw error;
   }
 }
