@@ -134,18 +134,18 @@ class SchemaConstraintTest {
 
     @Test
     fun `설계한 인덱스가 이름 그대로 있다`() {
-        assertThat(ordersIndexDefinitions()).containsKeys(*DESIGNED_INDEXES)
+        assertThat(readOrdersIndexDefinitions()).containsKeys(*DESIGNED_INDEXES)
     }
 
     @Test
     fun `outbox 대기 인덱스는 PENDING 행만 담는 부분 인덱스다`() {
-        assertThat(ordersIndexDefinitions()["outbox_pending_idx"])
+        assertThat(readOrdersIndexDefinitions()["outbox_pending_idx"])
             .contains("WHERE")
             .contains("status")
             .contains("'PENDING'")
     }
 
-    private fun ordersIndexDefinitions(): Map<String, String> = jdbc.sql("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'orders'")
+    private fun readOrdersIndexDefinitions(): Map<String, String> = jdbc.sql("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'orders'")
         .query { rs, _ -> rs.getString("indexname") to rs.getString("indexdef") }
         .list()
         .toMap()
