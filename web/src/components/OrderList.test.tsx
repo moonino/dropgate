@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createOrder } from "@/test/fixtures";
 import { OrderList } from "./OrderList";
+
+const DROP_CLOSED_REJECTION = { kind: "rejected", code: "DROP_CLOSED", message: "마감한 드롭의 주문은 취소할 수 없습니다", retryAfterSeconds: undefined } as const;
 
 describe("OrderList", () => {
   it("취소하면 그 주문을 취소됨으로 바꾸고 결과를 알린다", async () => {
@@ -17,15 +19,22 @@ describe("OrderList", () => {
     expect(screen.getByRole("status")).toHaveTextContent("주문을 취소했습니다");
   });
 
-  it("마감 뒤라 거절되면 버튼을 서버 문구로 바꾼다", async () => {
+  it("마감 뒤라 거절되면 취소 버튼을 비활성화한다", async () => {
     const order = createOrder();
-    const cancel = vi.fn().mockResolvedValue({ kind: "rejected", code: "DROP_CLOSED", message: "마감한 드롭의 주문은 취소할 수 없습니다", retryAfterSeconds: undefined });
-    render(<OrderList firstPage={{ items: [order], nextCursor: null }} cancel={cancel} loadPage={vi.fn()} />);
+    render(<OrderList firstPage={{ items: [order], nextCursor: null }} cancel={vi.fn().mockResolvedValue(DROP_CLOSED_REJECTION)} loadPage={vi.fn()} />);
 
     await userEvent.click(screen.getByRole("button", { name: `${order.dropName} 주문 취소` }));
 
-    expect(await screen.findAllByText("마감한 드롭의 주문은 취소할 수 없습니다")).not.toHaveLength(0);
-    expect(screen.queryByRole("button", { name: /주문 취소/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: `${order.dropName} 주문 취소` })).toBeDisabled());
+  });
+
+  it("마감 뒤라 거절되면 주문 행에 서버 문구를 보여 준다", async () => {
+    const order = createOrder();
+    render(<OrderList firstPage={{ items: [order], nextCursor: null }} cancel={vi.fn().mockResolvedValue(DROP_CLOSED_REJECTION)} loadPage={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: `${order.dropName} 주문 취소` }));
+
+    expect(await screen.findByRole("listitem")).toHaveTextContent(DROP_CLOSED_REJECTION.message);
   });
 
   it("503이면 알림에 Retry-After 초 뒤 다시 시도하라는 안내를 붙인다", async () => {

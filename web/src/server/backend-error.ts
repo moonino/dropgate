@@ -1,6 +1,7 @@
 import type { ErrorResponse, FieldError } from "@/api/types";
 import { parseRetryAfterSeconds } from "@/domain/retry";
 
+const UNAUTHORIZED = 401;
 const SERVICE_UNAVAILABLE = 503;
 
 export class BackendError extends Error {
@@ -22,6 +23,10 @@ export class BackendError extends Error {
 
   static unreachable(): BackendError {
     return new BackendError(SERVICE_UNAVAILABLE, UNREACHABLE_ERROR.code, UNREACHABLE_ERROR.message, [], undefined);
+  }
+
+  isUnauthenticated(): boolean {
+    return this.status === UNAUTHORIZED;
   }
 
   isUnavailable(): boolean {

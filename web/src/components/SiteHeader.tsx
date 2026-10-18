@@ -2,7 +2,7 @@ import Link from "next/link";
 import { describeAuthUnavailable } from "@/domain/login-errors";
 import { readServerTimeMillis } from "@/server/clock";
 import { readRequestViewer } from "@/server/request-session";
-import { isAdmin, type Viewer } from "@/server/viewer";
+import { isAdmin, isSignedOut, type Viewer } from "@/server/viewer";
 import { KstClock } from "./KstClock";
 import { NavLinks, type NavItem } from "./NavLinks";
 
@@ -39,7 +39,7 @@ function ViewerControls({ viewer }: { viewer: Viewer }) {
       </p>
     );
   }
-  if (viewer.kind === "anonymous") {
+  if (isSignedOut(viewer)) {
     return (
       <Link href="/login" className="button button--small">
         로그인

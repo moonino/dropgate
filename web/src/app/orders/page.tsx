@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import type { OrderPage } from "@/api/types";
 import { OrderList } from "@/components/OrderList";
 import { UnavailableNotice } from "@/components/UnavailableNotice";
 import { describeAuthUnavailable } from "@/domain/login-errors";
 import { callBackendOrUnavailable } from "@/server/backend";
-import { readRequestViewer } from "@/server/request-session";
-import type { Viewer } from "@/server/viewer";
+import { expireSessionIfUnauthenticated, requireViewer } from "@/server/request-session";
+import type { ActiveViewer } from "@/server/viewer";
 import { cancelOrder, loadOrdersPage } from "./actions";
 
 export const metadata: Metadata = { title: "내 주문" };
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
-  const viewer = await readRequestViewer();
-  if (viewer.kind === "anonymous") redirect("/login");
+  const viewer = await requireViewer();
   return (
     <main className="page">
       <div className="page-title">
@@ -26,9 +24,9 @@ export default async function OrdersPage() {
   );
 }
 
-async function Orders({ viewer }: { viewer: Exclude<Viewer, { kind: "anonymous" }> }) {
+async function Orders({ viewer }: { viewer: ActiveViewer }) {
   if (viewer.kind === "unavailable") return <UnavailableNotice message={describeAuthUnavailable(viewer.retryAfterSeconds)} />;
-  const firstPage = await callBackendOrUnavailable<OrderPage>("order", "/api/orders/me", { accessToken: viewer.accessToken });
+  const firstPage = await callBackendOrUnavailable<OrderPage>("order", "/api/orders/me", { accessToken: viewer.accessToken }).catch(expireSessionIfUnauthenticated);
   if (firstPage.kind === "unavailable") return <UnavailableNotice message={firstPage.notice} />;
   return <OrderList firstPage={firstPage.body} cancel={cancelOrder} loadPage={loadOrdersPage} />;
 }

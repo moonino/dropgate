@@ -18,7 +18,7 @@ export async function purchaseDrop(dropId: string): Promise<PurchaseOutcome> {
     return { kind: "confirmed", orderId: order.id, confirmedAt: order.confirmedAt };
   } catch (error) {
     if (!(error instanceof BackendError)) throw error;
-    if (error.status === 401) await signOutAndRedirect();
+    if (error.isUnauthenticated()) await signOutAndRedirect();
     return { kind: "rejected", code: error.code, message: error.message, retryAfterSeconds: error.retryAfterSeconds };
   }
 }

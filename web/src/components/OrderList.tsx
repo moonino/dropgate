@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { Order, OrderPage } from "@/api/types";
-import { decideCancelControl, type CancelOutcome, type CancelRejection } from "@/domain/cancel";
+import { decideCancelControl, type CancelControl, type CancelOutcome, type CancelRejection } from "@/domain/cancel";
 import { appendRetryAfter } from "@/domain/retry";
 import { ORDER_STATUS_BADGES } from "@/domain/status";
 import { formatKstStamp } from "@/domain/time";
@@ -84,16 +84,33 @@ function OrderRow({ order, rejection, pending, onCancel }: OrderRowProps) {
       </div>
       <StatusBadge badge={ORDER_STATUS_BADGES[order.status]} />
       <div style={{ flex: "0 0 180px", display: "flex", justifyContent: "flex-end" }}>
-        {control.kind === "button" ? (
-          <button type="button" className="button button--small button--danger" disabled={pending} onClick={() => onCancel(order.id)} aria-label={`${order.dropName} 주문 취소`}>
-            주문 취소
-          </button>
-        ) : (
-          <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
-            {control.text}
-          </span>
-        )}
+        <CancelControlView control={control} order={order} pending={pending} onCancel={onCancel} />
       </div>
     </li>
+  );
+}
+
+type CancelControlViewProps = { control: CancelControl; order: Order; pending: boolean; onCancel: (orderId: string) => void };
+
+function CancelControlView({ control, order, pending, onCancel }: CancelControlViewProps) {
+  if (control.kind === "note") {
+    return (
+      <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
+        {control.text}
+      </span>
+    );
+  }
+  const disabled = control.kind === "disabled";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+      <button type="button" className="button button--small button--danger" disabled={pending || disabled} onClick={() => onCancel(order.id)} aria-label={`${order.dropName} 주문 취소`}>
+        주문 취소
+      </button>
+      {disabled && (
+        <span className="muted" style={{ fontSize: 13, textAlign: "right" }}>
+          {control.message}
+        </span>
+      )}
+    </div>
   );
 }

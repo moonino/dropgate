@@ -13,6 +13,7 @@ import { callBackendOrUnavailable, type BackendResult } from "@/server/backend";
 import { BackendError } from "@/server/backend-error";
 import { readServerTimeMillis } from "@/server/clock";
 import { readRequestViewer } from "@/server/request-session";
+import { isSignedOut } from "@/server/viewer";
 import { purchaseDrop } from "./actions";
 
 export const metadata: Metadata = { title: "드롭 상세" };
@@ -50,7 +51,7 @@ export default async function DropDetailPage({ params }: DropPageProps) {
             <p style={{ margin: 0, fontSize: 20 }}>{formatKstDay(drop.closeAt)} {formatKstTime(drop.closeAt)} 마감했습니다</p>
           )}
           <div style={{ flex: "0 1 340px", minWidth: 260 }}>
-            <BuyPanel drop={drop} signedIn={viewer.kind !== "anonymous"} purchase={purchaseDrop} />
+            <BuyPanel drop={drop} signedIn={!isSignedOut(viewer)} purchase={purchaseDrop} />
           </div>
           <SaleOpenAnnouncement status={drop.status} />
         </section>

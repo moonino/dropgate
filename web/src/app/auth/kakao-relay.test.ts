@@ -34,6 +34,14 @@ describe("카카오 로그인 시작 중계", () => {
     expect(response.headers.getSetCookie()).toContain(STATE_COOKIE);
   });
 
+  it("auth-service에 연결하지 못하면 로그인 화면에 로그인 서버 오류를 띄운다", async () => {
+    server.use(http.get(`${AUTH}/auth/login/kakao`, () => HttpResponse.error()));
+
+    const response = await startLogin(new NextRequest(`${WEB}/auth/login/kakao`));
+
+    expect(response.headers.get("Location")).toBe(`${WEB}/login?error=AUTH_UNAVAILABLE`);
+  });
+
   it("auth-service가 리다이렉트하지 못하면 로그인 화면에 카카오 오류를 띄운다", async () => {
     server.use(http.get(`${AUTH}/auth/login/kakao`, () => HttpResponse.json({ code: "AUTH_UNAVAILABLE", message: "x" }, { status: 503 })));
 
@@ -112,5 +120,13 @@ describe("카카오 콜백 중계", () => {
 
     expect(response.headers.get("Location")).toBe(`${WEB}/login?error=VALIDATION_FAILED`);
     expect(response.headers.getSetCookie().some((cookie) => cookie.startsWith("dropgate_access="))).toBe(false);
+  });
+
+  it("auth-service에 연결하지 못하면 로그인 화면에 로그인 서버 오류를 띄운다", async () => {
+    server.use(http.get(`${AUTH}/auth/callback/kakao`, () => HttpResponse.error()));
+
+    const response = await handleCallback(new NextRequest(`${WEB}/auth/callback/kakao?code=c&state=s`));
+
+    expect(response.headers.get("Location")).toBe(`${WEB}/login?error=AUTH_UNAVAILABLE`);
   });
 });

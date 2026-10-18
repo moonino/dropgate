@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { DropForm } from "@/components/DropForm";
 import { UnavailableNotice } from "@/components/UnavailableNotice";
 import { describeAuthUnavailable } from "@/domain/login-errors";
-import { readRequestViewer } from "@/server/request-session";
+import { requireViewer } from "@/server/request-session";
 import { isAdmin } from "@/server/viewer";
 import { createDropAction } from "./actions";
 
@@ -11,8 +10,7 @@ export const metadata: Metadata = { title: "드롭 등록" };
 export const dynamic = "force-dynamic";
 
 export default async function NewDropPage() {
-  const viewer = await readRequestViewer();
-  if (viewer.kind === "anonymous") redirect("/login");
+  const viewer = await requireViewer();
   if (viewer.kind === "unavailable") {
     return (
       <main className="page">

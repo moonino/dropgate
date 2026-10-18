@@ -29,7 +29,7 @@ export async function createDropAction(_previous: DropFormState, form: FormData)
     drop = await callBackend<Drop>("order", "/api/admin/drops", { method: "POST", body: parsed.request, accessToken });
   } catch (error) {
     if (!(error instanceof BackendError)) throw error;
-    if (error.status === 401) await signOutAndRedirect();
+    if (error.isUnauthenticated()) await signOutAndRedirect();
     return { kind: "rejected", message: error.message, fieldErrors: error.fieldErrors, retryAfterSeconds: error.retryAfterSeconds, values };
   }
   redirect(`/drops/${drop.id}`);

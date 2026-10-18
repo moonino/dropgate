@@ -3,15 +3,22 @@ import type { TokenPair } from "@/api/types";
 import { sendBackendRequest } from "@/server/backend";
 import { BackendError } from "@/server/backend-error";
 import { forwardSetCookies } from "@/server/forward-cookies";
+import { createLoginErrorPath, redirectToAuthUnavailable } from "@/server/login-redirect";
 import { redirectFound } from "@/server/redirect";
 import { writeSession } from "@/server/session";
 
 export async function GET(request: NextRequest): Promise<Response> {
-  const upstream = await sendBackendRequest("auth", `/auth/callback/kakao${request.nextUrl.search}`, {
-    cookieHeader: request.headers.get("cookie") ?? "",
-  });
+  let upstream: Response;
+  try {
+    upstream = await sendBackendRequest("auth", `/auth/callback/kakao${request.nextUrl.search}`, {
+      cookieHeader: request.headers.get("cookie") ?? "",
+    });
+  } catch (error) {
+    return redirectToAuthUnavailable(error, request);
+  }
   if (!upstream.ok) {
-    const failed = redirectFound(createLoginErrorPath(await BackendError.fromResponse(upstream)), request);
+    const error = await BackendError.fromResponse(upstream);
+    const failed = redirectFound(createLoginErrorPath(error.code, error.retryAfterSeconds), request);
     forwardSetCookies(upstream, failed);
     return failed;
   }
@@ -20,10 +27,4 @@ export async function GET(request: NextRequest): Promise<Response> {
   writeSession(response.cookies, tokens);
   forwardSetCookies(upstream, response);
   return response;
-}
-
-function createLoginErrorPath(error: BackendError): string {
-  const query = new URLSearchParams({ error: error.code });
-  if (error.retryAfterSeconds !== undefined) query.set("retryAfter", String(error.retryAfterSeconds));
-  return `/login?${query}`;
 }

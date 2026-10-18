@@ -24,9 +24,13 @@ describe("fetchViewer", () => {
     expect(await fetchViewer(SIGNED_IN)).toEqual({ kind: "unavailable", retryAfterSeconds: undefined });
   });
 
-  it("인증 서버가 401이면 비로그인으로 본다", async () => {
+  it("인증 서버가 401이면 만료된 세션으로 본다", async () => {
     server.use(http.get(`${AUTH}/auth/me`, () => HttpResponse.json({ code: "UNAUTHENTICATED", message: "x" }, { status: 401 })));
 
-    expect(await fetchViewer(SIGNED_IN)).toEqual({ kind: "anonymous" });
+    expect(await fetchViewer(SIGNED_IN)).toEqual({ kind: "expired" });
+  });
+
+  it("액세스 토큰 쿠키가 없으면 인증 서버를 부르지 않고 비로그인으로 본다", async () => {
+    expect(await fetchViewer({ kind: "anonymous" })).toEqual({ kind: "anonymous" });
   });
 });
