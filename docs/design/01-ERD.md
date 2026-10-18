@@ -217,7 +217,7 @@ BATCH_JOB_INSTANCE, BATCH_JOB_EXECUTION, BATCH_JOB_EXECUTION_PARAMS, BATCH_STEP_
 | orders.orders | orders_forbid_delete | DELETE 거절 |
 | orders.order_ledger | ledger_immutable | UPDATE, DELETE, TRUNCATE 거절 |
 
-제약과 트리거는 전부 SchemaConstraintTest로 고정한다(미터엔진 방식). 예상 테스트 수 12개.
+제약과 트리거는 전부 SchemaConstraintTest로 고정한다(미터엔진 방식).
 
 ## 합성 데이터
 
