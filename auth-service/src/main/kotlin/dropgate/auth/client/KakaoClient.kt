@@ -1,5 +1,7 @@
 package dropgate.auth.client
 
+import dropgate.common.error.DropgateException
+import dropgate.common.error.ErrorCode
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest
@@ -37,7 +39,7 @@ class KakaoClient(
             val accessToken = requestAccessToken(code)
             return parseUser(requestUser(accessToken))
         } catch (cause: RuntimeException) {
-            throw KakaoUnavailableException(cause)
+            throw DropgateException(ErrorCode.KAKAO_UNAVAILABLE, "카카오 로그인 서버에 연결할 수 없습니다", cause = cause)
         }
     }
 
@@ -97,5 +99,3 @@ class KakaoClient(
 }
 
 data class KakaoUserResponse(val id: Long, val nickname: String)
-
-class KakaoUnavailableException(cause: Throwable) : RuntimeException("카카오 로그인 서버에 연결할 수 없습니다", cause)
