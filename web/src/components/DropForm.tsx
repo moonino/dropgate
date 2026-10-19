@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import type { DropFormState } from "@/app/admin/drops/new/actions";
 import { groupFieldErrors, type DropFormFields } from "@/domain/drop-form";
 import { appendRetryAfter } from "@/domain/retry";
+import { navigateToSessionRecovery } from "./session-navigation";
 
 type DropFormProps = { action: (previous: DropFormState, form: FormData) => Promise<DropFormState> };
 
@@ -13,6 +14,9 @@ const INITIAL_VALUES: DropFormFields = { name: "", totalQuantity: "100", admissi
 
 export function DropForm({ action }: DropFormProps) {
   const [state, submit, pending] = useActionState(action, INITIAL_STATE);
+  useEffect(() => {
+    if (state.kind === "refresh-required") navigateToSessionRecovery();
+  }, [state]);
   const errors = state.kind === "rejected" ? groupFieldErrors(state.fieldErrors) : {};
   const values = state.kind === "rejected" ? state.values : INITIAL_VALUES;
   return (
