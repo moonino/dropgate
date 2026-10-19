@@ -85,7 +85,7 @@ meta가 없거나 status가 OPEN과 SOLD_OUT 중 하나가 아니어도 DROP_NOT
 
 ### DB 저장 실패 보상 (compensate.lua)
 
-KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 INCR 결과가 1이며 meta status가 SOLD_OUT이면 OPEN으로 되돌린다. 마지막 재고의 DB 저장 실패 뒤 SOLD_OUT만 남아 복구한 재고를 팔지 못하는 일을 막는다.
+KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 INCR 결과가 1이며 meta status가 SOLD_OUT이면 OPEN으로 되돌린다. 마지막 재고의 DB 저장 실패 뒤 복구한 재고와 meta 상태가 불일치하는 것을 막는다.
 
 ### 취소 보상 Lua (cancel.lua)
 
