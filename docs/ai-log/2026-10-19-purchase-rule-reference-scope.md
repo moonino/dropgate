@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 날짜, 도구 | 2026-10-19, Claude Code 자동 리뷰 제안(요약 댓글의 제안) |
-| 제안 요지 | 구매 응답과 상태 동기화, 초기화 및 복구 절차를 02 문서에만 두고 08, ADR 0006, ADR 0007, OpenAPI는 참조만 남긴다 |
-| 왜 틀렸나 | 과잉. 네 문서의 응답 조건과 순서는 이미 일치한다. 지금은 초기화 복구와 로그아웃 실패 경계를 고정하는 변경이고 응답 계약의 설명 배치는 바꾸지 않는다 |
-| 어떻게 알았나 | 문서 대조. meta 허용 상태, 입장 검사 우선순위, buyers와 stock의 순서가 02, 08, ADR 0007, OpenAPI에 같은 조건으로 적혀 있다 [리뷰](https://github.com/moonino/dropgate/pull/120#issuecomment-6259776284), [같은 취지의 후속 리뷰](https://github.com/moonino/dropgate/pull/120#issuecomment-6259922463), [같은 취지의 키 유실 후속 리뷰](https://github.com/moonino/dropgate/pull/120#issuecomment-6260016082) |
-| 대신 한 것 | 초기화와 설정 계약은 02 참조로 줄였고, 구매 거절 응답과 상태 동기화, 초기화 및 복구의 핵심 요약은 API와 시퀀스 문서, 장애 정책 ADR의 독자가 해당 문서에서도 호출 시점과 안전 조건을 이해할 수 있게 유지했다. PR #120 |
+| 제안 요지 | 구매 응답과 상태 동기화, 초기화 및 복구 절차를 02 문서에만 두고 08, ADR 0006, ADR 0007, OpenAPI는 참조만 남긴다. |
+| 왜 틀렸나 | 과잉. 네 문서의 응답 조건과 순서는 이미 일치한다. 지금은 초기화 복구와 로그아웃 실패 경계를 고정하는 변경이고 응답 계약의 설명 배치는 바꾸지 않는다. |
+| 어떻게 알았나 | 문서 대조. meta 허용 상태, 입장 검사 우선순위, buyers와 stock의 순서가 02, 08, ADR 0007, OpenAPI에 같은 조건으로 적혀 있다. [리뷰](https://github.com/moonino/dropgate/pull/120#issuecomment-6259776284), [같은 취지의 후속 리뷰](https://github.com/moonino/dropgate/pull/120#issuecomment-6259922463), [같은 취지의 키 유실 후속 리뷰](https://github.com/moonino/dropgate/pull/120#issuecomment-6260016082). |
+| 대신 한 것 | 초기화와 설정 계약은 02 참조로 줄였고, 구매 거절 응답과 상태 동기화, 초기화 및 복구의 핵심 요약은 API와 시퀀스 문서, 장애 정책 ADR의 독자가 해당 문서에서도 호출 시점과 안전 조건을 이해할 수 있게 유지했다. PR #120. |
