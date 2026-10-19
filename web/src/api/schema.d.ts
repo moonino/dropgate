@@ -145,7 +145,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 액세스 토큰 무효화와 리프레시 전부 폐기 */
+        /**
+         * 액세스 토큰 무효화와 리프레시 전부 폐기
+         * @description 성공하면 204이며 해당 사용자의 모든 리프레시를 폐기해 이후 재발급은 401이다. Redis 실패는 503 AUTH_UNAVAILABLE과 Retry-After 2다.
+         */
         post: {
             parameters: {
                 query?: never;
