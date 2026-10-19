@@ -21,6 +21,7 @@ erDiagram
         varchar name
         int total_quantity
         int remaining_quantity
+        boolean stock_initialization_claimed
         timestamptz open_at
         timestamptz close_at
         varchar status
@@ -111,6 +112,7 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 | name | varchar(100) | NOT NULL | |
 | total_quantity | int | NOT NULL, CHECK (total_quantity > 0) | 초기 재고. OPEN 이후 변경 불가(트리거) |
 | remaining_quantity | int | NOT NULL, CHECK (remaining_quantity BETWEEN 0 AND total_quantity) | 1주 차 DB만 경로의 재고. 2주 차부터 재고의 정본은 Redis고 이 컬럼은 DB 경로 플래그가 켜졌을 때만 갱신한다. 대조 배치는 이 컬럼이 아니라 orders 건수를 본다 |
+| stock_initialization_claimed | boolean | NOT NULL, DEFAULT false | Redis 초기화 권한을 한 번만 사용한다. OPEN일 때 false에서 true로 바꾼 트랜잭션을 커밋한 호출만 init.lua를 실행한다. 실패해도 true를 유지한다 |
 | open_at | timestamptz | NOT NULL | |
 | close_at | timestamptz | NOT NULL, CHECK (close_at > open_at) | |
 | status | varchar(20) | NOT NULL, CHECK (status IN ('SCHEDULED','OPEN','SOLD_OUT','CLOSED')), DEFAULT 'SCHEDULED' | 상태 전이는 서비스가, 허용 전이는 트리거가 검사 |
@@ -119,7 +121,7 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 | created_at | timestamptz | NOT NULL, DEFAULT now() | |
 | updated_at | timestamptz | NOT NULL, DEFAULT now() | 트리거로 갱신 |
 
-허용 상태 전이: SCHEDULED -> OPEN, OPEN -> SOLD_OUT, OPEN -> CLOSED, SOLD_OUT -> CLOSED, SOLD_OUT -> OPEN(취소로 재고가 돌아온 경우, ADR 0019). 그 외는 트리거가 거절한다. total_quantity, open_at은 OPEN 이후 변경을 트리거가 거절한다.
+허용 상태 전이: SCHEDULED -> OPEN, OPEN -> SOLD_OUT, OPEN -> CLOSED, SOLD_OUT -> CLOSED, SOLD_OUT -> OPEN(취소 또는 Redis 경로 DB 상태 동기화, ADR 0019와 ADR 0007). 그 외는 트리거가 거절한다. total_quantity, open_at은 OPEN 이후 변경을 트리거가 거절한다.
 
 인덱스: `drops_status_open_at_idx (status, open_at)`. 목록 조회가 status IN ('SCHEDULED','OPEN','SOLD_OUT') ORDER BY open_at이다.
 

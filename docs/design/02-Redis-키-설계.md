@@ -27,15 +27,19 @@ Sentinel 마스터 이름 `dropgate-master`. 클라이언트는 Lettuce Sentinel
 
 | 키 | 자료형 | 값 | TTL | 뜻 |
 |---|---|---|---|---|
-| `drop:{dropId}:stock` | string(int) | 남은 수량 | close_at + 7일 | DB OPEN 드롭을 매 틱 init.lua로 멱등 초기화(SET NX total_quantity) |
+| `drop:{dropId}:stock` | string(int) | 남은 수량 | close_at + 7일 | DB의 1회 초기화 권한을 커밋한 호출만 SET NX total_quantity. 키 유실 뒤 자동 재생성하지 않음 |
 | `drop:{dropId}:buyers` | set | userId | close_at + 7일 | 구매 성공한 사용자. 1인 1회 1차 방어 |
 | `drop:{dropId}:meta` | hash | status, open_at, close_at, rate | close_at + 7일 | status는 OPEN과 SOLD_OUT뿐. open_at과 close_at은 epoch ms 정수 문자열. CLOSED는 쓰지 않고 close_at으로 마감을 판정 |
 
 ### OPEN 초기화 (init.lua)
 
-드롭 상태 스케줄러는 매 틱 DB 상태 전이 뒤 DB status가 OPEN인 드롭마다 init.lua를 부른다. KEYS stock, meta. ARGV total_quantity, open_at ms, close_at ms, rate. meta가 있으면 아무것도 하지 않고 0을 돌려준다. 없으면 meta를 HSET(status OPEN, open_at, close_at, rate), stock을 SET NX total_quantity 하고 두 키를 PEXPIREAT close_at + 7일로 맞춘 뒤 1을 돌려준다.
+드롭 상태 스케줄러는 매 틱 DB 상태 전이 뒤 OPEN 드롭의 초기화 권한을 요청한다. 별도 DB 트랜잭션으로 `UPDATE drops SET stock_initialization_claimed=true WHERE id=? AND status='OPEN' AND stock_initialization_claimed=false`를 커밋하고, 영향 행이 1인 호출만 init.lua를 실행한다. claim은 Redis와 분리해 영속 저장하므로 여러 파드가 초기화해도 권한은 한 번뿐이다.
 
-Redis 실패는 경고 로그만 남기고 다음 틱에 다시 시도한다. 초기화 전 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 초기화한다(ADR 0005).
+init.lua의 KEYS는 stock, meta이고 ARGV는 total_quantity, open_at ms, close_at ms, rate다. meta가 있으면 아무것도 하지 않고 0을 돌려준다. 없으면 meta를 HSET(status OPEN, open_at, close_at, rate), stock을 SET NX total_quantity 하고 두 키를 PEXPIREAT close_at + 7일로 맞춘 뒤 1을 돌려준다.
+
+최초 초기화 실패도 실행 여부를 확신할 수 없으므로 claim을 유지하고 경고 로그를 남긴다. 다음 틱에 자동 재시도하지 않고 판매를 차단해 수동 복구한다. claim=true 드롭의 Redis 키가 유실돼도 자동 재생성하지 않는다. 초기화 전이나 meta 유실 뒤 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 같은 초기화 절차를 쓴다(ADR 0005).
+
+수동 복구는 모든 주문 인스턴스를 중지하고 진행 중 DB 트랜잭션 종료를 확인한 뒤 한다. CONFIRMED 주문 수로 stock을 total_quantity에서 그 수를 뺀 값으로, buyers를 해당 사용자 집합으로 복원하고 meta의 상태와 시각, rate 및 각 키의 TTL을 맞춘 뒤 재개한다. claim은 true로 유지한다. DB 건수만 보고 자동 초기화를 허용하지 않는다. 진행 중 주문이 아직 집계되지 않을 수 있어 가용성보다 초과 판매 방지를 택한다.
 
 드롭 단건의 remainingQuantity는 stock GET, 목록은 페이지 항목의 stock을 MGET 한 번으로 읽는다. 키 없음(SCHEDULED, 초기화 전), Redis 실패, 200ms 초과면 해당 수량만 null이고 HTTP 200을 유지한다. DB 경로의 stock은 판매 때 줄지 않아 total_quantity에 머문다(ADR 0005).
 
@@ -79,7 +83,7 @@ meta가 없거나 status가 OPEN과 SOLD_OUT 중 하나가 아니어도 DROP_NOT
 
 반환 첫 값이 0 이상이면 성공이고 남은 수량이다. 성공 뒤에만 DB 트랜잭션(orders INSERT, order_ledger INSERT, outbox INSERT)을 연다. INSERT 0행(UNIQUE)이면 compensate.lua 뒤 409 ALREADY_PURCHASED, DB 예외면 compensate.lua 뒤 503 ORDER_PERSIST_FAILED다. 보상 실패는 `dropgate_stock_compensation_failed_total{drop}`과 error 로그에 남기고 응답 코드는 유지한다. 대조 배치가 불일치를 잡는다.
 
-남은 수량이 0이면 별 트랜잭션으로 `UPDATE drops SET status='SOLD_OUT' WHERE id=? AND status='OPEN'`을 한다. 실패는 경고 로그만 남긴다. Redis 경로는 remaining_quantity를 바꾸지 않는다.
+모든 성공 구매 확정, 성공한 compensate.lua, 성공한 cancel.lua 뒤에는 아래 DB 판매 상태 동기화를 한다. Redis 경로는 remaining_quantity를 바꾸지 않는다.
 
 모든 키가 같은 드롭 아래라 Cluster로 가도 해시 태그 `{dropId}`로 같은 슬롯에 둘 수 있다. 지금은 Sentinel이라 상관없다.
 
@@ -89,7 +93,13 @@ KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 
 
 ### 취소 보상 Lua (cancel.lua)
 
-KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 meta status가 SOLD_OUT이면 OPEN으로 바꿔 1, 아니면 0을 돌려준다. 1이면 별 트랜잭션으로 `UPDATE drops SET status='OPEN' WHERE id=? AND status='SOLD_OUT'`을 한다. 이 UPDATE 실패는 경고 로그만 남긴다. buyers에서 빼도 DB UNIQUE(drop_id, user_id)가 남아 취소한 사용자의 재구매는 DB에서 막힌다.
+KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 meta status가 SOLD_OUT이면 OPEN으로 바꿔 1, 아니면 0을 돌려준다. 반환값과 관계없이 성공 뒤 DB 판매 상태를 동기화한다. buyers에서 빼도 DB UNIQUE(drop_id, user_id)가 남아 취소한 사용자의 재구매는 DB에서 막힌다.
+
+### DB 판매 상태 동기화
+
+`synchronizeSaleStatus(dropId)`는 새 DB 트랜잭션에서 먼저 drops 행을 FOR UPDATE로 잠근다. 잠금을 얻은 뒤 별도 문장의 새 READ COMMITTED 스냅샷으로 CONFIRMED 주문 수를 읽는다. 수가 total_quantity와 같으면 SOLD_OUT, 작으면 OPEN으로 갱신한다. CLOSED, SCHEDULED와 remaining_quantity는 유지한다. 상태 갱신은 모두 이 잠금으로 직렬화하고 실패는 경고 로그만 남긴다.
+
+마지막 구매만 호출하면 앞서 예약한 구매가 늦게 확정된 뒤 DB가 OPEN으로 남을 수 있다. 단순한 조건부 상태 UPDATE도 지연된 구매 갱신이 취소를 덮거나 보상 뒤 SOLD_OUT이 남는 경쟁을 막지 못한다. 모든 성공 확정과 보상, 취소가 같은 동기화를 호출한다(ADR 0007).
 
 `dropgate.order.purchase-path`(`DROPGATE_PURCHASE_PATH`)는 redis(기본) 또는 db로 구매와 취소 구현을 함께 고른다. 바꿔 끼우는 단위는 구매 흐름 전체다(ADR 0005).
 
