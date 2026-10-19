@@ -21,5 +21,9 @@ server:
   port: 8082
 
 dropgate:
+  order:
+    purchase-path: ${DROPGATE_PURCHASE_PATH:db}
+    queue:
+      enabled: ${DROPGATE_QUEUE_ENABLED:false}
   auth:
     jwks-uri: ${DROPGATE_AUTH_JWKS_URI}

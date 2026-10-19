@@ -2,6 +2,7 @@ package dropgate.order
 
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.order.configuration.OrderProperties
 import dropgate.order.entity.DropEntity
 import dropgate.order.entity.DropStatus
 import dropgate.order.repository.DropStockRepository
@@ -88,7 +89,7 @@ class DropStockInitializationTest {
         unavailable.afterPropertiesSet()
         val drop = createDrop()
         try {
-            val repository = DropStockRepository(StringRedisTemplate(unavailable))
+            val repository = DropStockRepository(StringRedisTemplate(unavailable), OrderProperties())
 
             assertThatThrownBy { repository.initialize(drop) }.isInstanceOfSatisfying(DropgateException::class.java) { failure ->
                 assertThat(failure.errorCode).isEqualTo(ErrorCode.STOCK_UNAVAILABLE)
