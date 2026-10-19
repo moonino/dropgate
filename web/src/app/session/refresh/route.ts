@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { TokenPair } from "@/api/types";
+import { REFRESHED_PARAMETER, REFRESHED_VALUE } from "@/domain/session-recovery";
 import { callBackend } from "@/server/backend";
 import { BackendError } from "@/server/backend-error";
 import { redirectToAuthUnavailable } from "@/server/login-redirect";
 import { FOUND, redirectFound } from "@/server/redirect";
 import { clearSession, REFRESH_COOKIE, writeSession } from "@/server/session";
-import { REFRESHED_PARAMETER, resolveSessionReturnUrl } from "@/server/session-return";
+import { resolveSessionReturnUrl } from "@/server/session-return";
 
 const LOGIN_PATH = "/login";
 
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const tokens = await callBackend<TokenPair>("auth", "/auth/token/refresh", { method: "POST", body: { refreshToken } });
     const destination = resolveSessionReturnUrl(request.nextUrl.searchParams.get("next"), request.url);
-    destination.searchParams.set(REFRESHED_PARAMETER, "1");
+    destination.searchParams.set(REFRESHED_PARAMETER, REFRESHED_VALUE);
     const response = NextResponse.redirect(destination, FOUND);
     writeSession(response.cookies, tokens);
     return response;
