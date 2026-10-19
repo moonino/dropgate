@@ -11,8 +11,5 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class CurrentUserController(private val tokens: AccessTokenDecoder, private val users: UserService) {
     @GetMapping("/auth/me")
-    fun getCurrentUser(@RequestHeader(value = HttpHeaders.AUTHORIZATION, defaultValue = "") authorization: String): UserResponse {
-        val user = users.getUser(tokens.decodeUserId(authorization))
-        return UserResponse(user.id, user.nickname, user.role)
-    }
+    fun getCurrentUser(@RequestHeader(value = HttpHeaders.AUTHORIZATION, defaultValue = "") authorization: String): UserResponse = UserResponse.createFrom(users.getUser(tokens.decodeUserId(authorization)))
 }

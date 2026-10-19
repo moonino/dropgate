@@ -9,5 +9,5 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 class JwksController(private val tokens: JwtTokenService) {
     @GetMapping("/.well-known/jwks.json")
-    fun getPublicKeys(): JwksResponse = JwksResponse(tokens.getPublicKeys().map { JwkResponse(it.kty, it.kid, it.use, it.alg, it.n, it.e) })
+    fun getPublicKeys(): JwksResponse = JwksResponse(tokens.getPublicKeys().map(JwkResponse::createFrom))
 }
