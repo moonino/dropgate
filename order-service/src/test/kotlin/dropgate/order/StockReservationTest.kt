@@ -89,7 +89,7 @@ class StockReservationTest @Autowired constructor(private val stocks: DropStockR
     }
 
     @Test
-    fun `입장 키를 소비한 구매자의 재요청은 구매자 검사 전에 입장 확인으로 거절한다`() {
+    fun `입장 확인을 켜면 성공한 구매가 입장 키를 소비한다`() {
         val drop = initializeDrop()
         val userId = UUID.randomUUID()
         val admission = "drop:${drop.id}:admit:$userId"
@@ -99,6 +99,16 @@ class StockReservationTest @Autowired constructor(private val stocks: DropStockR
         assertThat(admittedStocks.purchase(drop.id, userId, Instant.now())).isEqualTo(StockReservation.Reserved(0))
 
         assertThat(redis.hasKey(admission)).isFalse()
+    }
+
+    @Test
+    fun `입장 키를 소비한 구매자의 재요청은 구매자 검사 전에 입장 확인으로 거절한다`() {
+        val drop = initializeDrop()
+        val userId = UUID.randomUUID()
+        val admittedStocks = DropStockRepository(redis, OrderProperties(queue = OrderProperties.Queue(enabled = true)))
+        redis.opsForValue().set("drop:${drop.id}:admit:$userId", "1")
+        admittedStocks.purchase(drop.id, userId, Instant.now())
+
         assertThat(admittedStocks.purchase(drop.id, userId, Instant.now())).isEqualTo(StockReservation.Rejected(ErrorCode.NOT_ADMITTED))
     }
 
