@@ -21,8 +21,8 @@ import kotlin.time.measureTime
 
 private const val STOCK_REDIS_PORT = 6379
 
-@Import(RedisPurchaseHttpConfiguration::class, StockTimeoutResponseTest.UnresponsiveStocks::class)
-class StockTimeoutResponseTest : OrderApiIntegrationTest() {
+@Import(StockTimeoutResponseTest.UnresponsiveStocks::class)
+class StockTimeoutResponseTest : RedisOrderApiIntegrationTest() {
     @Autowired
     lateinit var isolated: UnresponsiveStocks
 

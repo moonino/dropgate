@@ -14,8 +14,8 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import java.net.ServerSocket
 import java.util.UUID
 
-@Import(RedisPurchaseHttpConfiguration::class, StockUnavailableResponseTest.UnavailableStocks::class)
-class StockUnavailableResponseTest : OrderApiIntegrationTest() {
+@Import(StockUnavailableResponseTest.UnavailableStocks::class)
+class StockUnavailableResponseTest : RedisOrderApiIntegrationTest() {
     @Test
     fun `인증 Redis는 정상이고 재고 연결만 거절되면 503과 재시도 헤더를 돌려준다`() {
         val dropId = insertDropWithStock()
