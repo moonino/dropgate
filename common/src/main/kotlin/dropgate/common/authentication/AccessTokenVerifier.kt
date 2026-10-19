@@ -18,13 +18,16 @@ private const val ROLE_CLAIM = "role"
 private const val TOKEN_TYPE_CLAIM = "typ"
 private const val REFRESH_TOKEN_TYPE = "refresh"
 
-class AccessTokenVerifier(private val jwkSetCache: JwkSetCache, private val clock: Clock) {
+class AccessTokenVerifier(private val jwkSetCache: JwkSetCache, private val clock: Clock, private val revokedAccessTokens: RevokedAccessTokens) {
     fun verify(token: String): AuthenticatedUser {
         val jwt = parse(token)
         verifySignature(jwt)
         val claims = readClaims(jwt)
         verifyClaims(claims)
-        return readUser(claims)
+        val user = readUser(claims)
+        val tokenId = claims.jwtid?.takeIf { it.isNotBlank() } ?: throw createVerificationFailure("토큰에 유효한 식별자 jti가 없습니다")
+        if (revokedAccessTokens.isRevoked(tokenId)) throw createVerificationFailure("토큰 식별자 jti $tokenId 는 무효화됐습니다")
+        return user
     }
 
     private fun parse(token: String): SignedJWT = try {

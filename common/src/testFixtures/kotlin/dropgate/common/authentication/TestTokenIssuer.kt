@@ -21,17 +21,17 @@ class TestTokenIssuer(private val clock: Clock, keyId: String = "test-key") {
 
     fun createJwkSetJson(): String = JWKSet(key.toPublicJWK()).toString()
 
-    fun issueAccessToken(userId: UUID = UUID.randomUUID(), role: String = "USER"): String = issueToken {
+    fun issueAccessToken(userId: UUID = UUID.randomUUID(), role: String = "USER", tokenId: String = UUID.randomUUID().toString()): String = issueToken(tokenId) {
         subject(userId.toString())
         claim("role", role)
     }
 
-    fun issueToken(customize: JWTClaimsSet.Builder.() -> Unit): String {
+    fun issueToken(tokenId: String = UUID.randomUUID().toString(), customize: JWTClaimsSet.Builder.() -> Unit): String {
         val issuedAt = clock.instant()
         val claims = JWTClaimsSet.Builder()
             .subject(UUID.randomUUID().toString())
             .issuer(TEST_ISSUER)
-            .jwtID(UUID.randomUUID().toString())
+            .jwtID(tokenId)
             .claim("role", "USER")
             .issueTime(Date.from(issuedAt))
             .expirationTime(Date.from(issuedAt.plus(ACCESS_TOKEN_TTL)))

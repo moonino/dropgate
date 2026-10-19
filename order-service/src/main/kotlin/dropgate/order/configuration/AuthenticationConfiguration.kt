@@ -6,11 +6,14 @@ import dropgate.common.authentication.AuthenticatedUserArgumentResolver
 import dropgate.common.authentication.JwkSetCache
 import dropgate.common.authentication.JwtAuthenticationFilter
 import dropgate.common.authentication.PublicEndpoint
+import dropgate.common.authentication.RedisRevokedAccessTokens
 import dropgate.common.authentication.RestClientJwkSetFetcher
+import dropgate.common.authentication.RevokedAccessTokens
 import dropgate.common.error.ErrorResponseWriter
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.HttpMethod
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
@@ -34,10 +37,13 @@ private val ORDER_PUBLIC_ENDPOINTS = listOf(
 @Configuration(proxyBeanMethods = false)
 class AuthenticationConfiguration : WebMvcConfigurer {
     @Bean
-    fun accessTokenVerifier(@Value("\${dropgate.auth.jwks-uri}") jwkSetUri: URI, clock: Clock): AccessTokenVerifier {
+    fun accessTokenVerifier(@Value("\${dropgate.auth.jwks-uri}") jwkSetUri: URI, clock: Clock, revokedAccessTokens: RevokedAccessTokens): AccessTokenVerifier {
         val fetcher = RestClientJwkSetFetcher(createJwksRestClient(), jwkSetUri)
-        return AccessTokenVerifier(JwkSetCache(fetcher, clock), clock)
+        return AccessTokenVerifier(JwkSetCache(fetcher, clock), clock, revokedAccessTokens)
     }
+
+    @Bean
+    fun revokedAccessTokens(redis: StringRedisTemplate): RevokedAccessTokens = RedisRevokedAccessTokens(redis)
 
     @Bean
     fun jwtAuthenticationFilter(verifier: AccessTokenVerifier, jsonMapper: ObjectMapper): JwtAuthenticationFilter = JwtAuthenticationFilter(verifier, ORDER_PUBLIC_ENDPOINTS, ErrorResponseWriter(jsonMapper))

@@ -1,10 +1,12 @@
 package dropgate.common.authentication
 
+import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
 import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.NullAndEmptySource
 import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
 import java.util.UUID
@@ -13,7 +15,35 @@ class AccessTokenVerifierTest {
     private val clock = MutableClock(Instant.parse("2026-10-17T00:00:00Z"))
     private val issuer = TestTokenIssuer(clock)
     private val fetcher = CountingJwkSetFetcher { issuer.createJwkSetJson() }
-    private val verifier = AccessTokenVerifier(JwkSetCache(fetcher, clock), clock)
+    private val revokedTokenId = UUID.randomUUID().toString()
+    private val revoked = InMemoryRevokedAccessTokens(setOf(revokedTokenId))
+    private val verifier = AccessTokenVerifier(JwkSetCache(fetcher, clock), clock, revoked)
+
+    @Test
+    fun `무효화된 jti면 토큰을 거부한다`() {
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { jwtID(revokedTokenId) }) }.hasMessageContaining("무효화")
+    }
+
+    @Test
+    fun `무효화되지 않은 토큰은 확인 뒤 통과한다`() {
+        assertThat(verifier.verify(issuer.issueAccessToken()).role).isEqualTo(Role.USER)
+        assertThat(revoked.lookupCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `무효화를 확인할 수 없으면 AUTH_UNAVAILABLE을 유지한다`() {
+        val unavailable = RevokedAccessTokens { throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "무효화 확인 실패") }
+        val verifier = AccessTokenVerifier(JwkSetCache(fetcher, clock), clock, unavailable)
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { verifier.verify(issuer.issueAccessToken()) }
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = [" "])
+    fun `jti가 없거나 비면 무효화를 조회하기 전에 거부한다`(tokenId: String?) {
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { jwtID(tokenId) }) }.hasMessageContaining("jti")
+        assertThat(revoked.lookupCount).isZero()
+    }
 
     @Test
     fun `유효한 토큰에서 사용자 식별자와 역할을 읽는다`() {
@@ -22,9 +52,10 @@ class AccessTokenVerifierTest {
     }
 
     @Test
-    fun `같은 kid의 다른 키로 서명한 토큰을 거부한다`() {
+    fun `서명이 깨진 토큰은 무효화를 확인하지 않는다`() {
         val forged = TestTokenIssuer(clock).issueAccessToken()
         assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(forged) }.hasMessageContaining("서명")
+        assertThat(revoked.lookupCount).isZero()
     }
 
     @Test
@@ -67,6 +98,7 @@ class AccessTokenVerifierTest {
     @Test
     fun `알 수 없는 역할의 토큰을 거부한다`() {
         assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { claim("role", "ROOT") }) }.hasMessageContaining("role")
+        assertThat(revoked.lookupCount).isZero()
     }
 
     @Test

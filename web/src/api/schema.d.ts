@@ -578,7 +578,7 @@ export interface paths {
         };
         /**
          * 내 주문, 최신순 커서 페이징
-         * @description confirmedAt 내림차순이고 같으면 id 내림차순이다. 취소한 주문도 포함한다. cursor는 앞 페이지의 nextCursor를 그대로 넘기는 불투명 문자열이다. 읽을 수 없거나 저장할 수 없는 시각을 담은 cursor는 400이고 errors의 field는 cursor다.
+         * @description confirmedAt 내림차순이고 같으면 id 내림차순이다. 취소한 주문도 포함한다. cursor는 앞 페이지의 nextCursor를 그대로 넘기는 불투명 문자열이다. 읽을 수 없거나 저장할 수 없는 시각을 담은 cursor는 400이고 errors의 field는 cursor다. 요청마다 토큰 무효화를 확인해 무효화면 401, 확인 실패면 503 AUTH_UNAVAILABLE과 Retry-After 2다.
          */
         get: {
             parameters: {
