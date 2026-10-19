@@ -19,10 +19,15 @@ describe("purchaseDrop", () => {
     expect(await purchaseDrop("drop-1")).toEqual({ kind: "refresh-required" });
   });
 
-  it("구매 서버가 401이면 쿠키를 지우지 않고 재발급 결과를 돌려준다", async () => {
-    cookieStore.set.mockClear();
+  it("구매 서버가 401이면 재발급 결과를 돌려준다", async () => {
     server.use(http.post("http://order.test/api/drops/drop-1/orders", () => HttpResponse.json({ code: "UNAUTHENTICATED", message: "x" }, { status: 401 })));
     expect(await purchaseDrop("drop-1")).toEqual({ kind: "refresh-required" });
+  });
+
+  it("구매 서버가 401이어도 세션 쿠키를 지우지 않는다", async () => {
+    cookieStore.set.mockClear();
+    server.use(http.post("http://order.test/api/drops/drop-1/orders", () => HttpResponse.json({ code: "UNAUTHENTICATED", message: "x" }, { status: 401 })));
+    await purchaseDrop("drop-1");
     expect(cookieStore.set).not.toHaveBeenCalled();
   });
 });
