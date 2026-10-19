@@ -41,7 +41,7 @@ init.lua의 KEYS는 stock, meta이고 ARGV는 total_quantity, open_at ms, close_
 
 최초 초기화 실패도 실행 여부를 확신할 수 없으므로 claim을 유지하고 경고 로그를 남긴다. 다음 틱에 자동 재시도하지 않는다. 키가 없으면 판매를 차단해 수동 복구하고, 응답만 유실돼 이미 성공한 키가 있으면 기존 구매 계약대로 사용한다. claim=true 드롭의 Redis 키가 유실돼도 자동 재생성하지 않는다. 초기화 전이나 meta 유실 뒤 Redis 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 같은 초기화 절차를 쓴다(ADR 0005).
 
-수동 복구는 모든 주문 인스턴스를 중지하고 진행 중 DB 트랜잭션 종료와 기존 Redis 클라이언트 연결 및 미처리 쓰기 제거를 확인한 뒤 한다. CONFIRMED 주문 수로 stock을 total_quantity에서 그 수를 뺀 값으로, buyers를 해당 사용자 집합으로 복원하고 meta의 상태와 시각, rate 및 각 키의 TTL을 맞춘 뒤 재개한다. claim은 true로 유지한다. DB 건수만 보고 자동 초기화를 허용하지 않는다. 진행 중 주문이 아직 집계되지 않을 수 있어 가용성보다 초과 판매 방지를 택한다.
+수동 복구는 모든 주문 인스턴스를 중지하고 진행 중 DB 트랜잭션 종료와 기존 Redis 클라이언트 연결 및 미처리 쓰기 제거를 확인한 뒤 한다. CONFIRMED 주문 수로 stock을 total_quantity에서 그 수를 뺀 값으로, buyers를 해당 사용자 집합으로 복원하고 meta의 상태와 시각, rate 및 각 키의 TTL을 맞춘다. DB 판매 상태도 아래 동기화 규칙대로 같은 주문 수에 맞춘 뒤 재개한다. claim은 true로 유지한다. DB 건수만 보고 자동 초기화를 허용하지 않는다. 진행 중 주문이 아직 집계되지 않을 수 있어 가용성보다 초과 판매 방지를 택한다.
 
 드롭 단건의 remainingQuantity는 stock GET, 목록은 페이지 항목의 stock을 MGET 한 번으로 읽는다. 키 없음(SCHEDULED, 초기화 전), Redis 실패, 200ms 초과면 해당 수량만 null이고 HTTP 200을 유지한다. DB 경로의 stock은 판매 때 줄지 않아 total_quantity에 머문다(ADR 0005).
 
@@ -91,11 +91,13 @@ meta가 없거나 status가 OPEN과 SOLD_OUT 중 하나가 아니어도 DROP_NOT
 
 ### DB 저장 실패 보상 (compensate.lua)
 
-KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 INCR 결과가 1이며 meta status가 SOLD_OUT이면 OPEN으로 되돌린다. 마지막 재고의 DB 저장 실패 뒤 복구한 재고와 meta 상태가 불일치하는 것을 막는다.
+KEYS stock, buyers, meta. ARGV userId. stock 또는 meta가 없으면 아무 쓰기도 하지 않고 -1을 반환한다. 둘 다 있으면 INCR stock, SREM buyers userId를 하고 INCR 결과가 1이며 meta status가 SOLD_OUT이면 OPEN으로 되돌린다. 성공은 복구한 수량(1 이상)을 반환한다. 마지막 재고의 DB 저장 실패 뒤 복구한 재고와 meta 상태가 불일치하는 것을 막는다.
 
 ### 취소 보상 Lua (cancel.lua)
 
-KEYS stock, buyers, meta. ARGV userId. INCR stock, SREM buyers userId를 하고 meta status가 SOLD_OUT이면 OPEN으로 바꿔 1, 아니면 0을 돌려준다. 반환값과 관계없이 성공 뒤 DB 판매 상태를 동기화한다. buyers에서 빼도 DB UNIQUE(drop_id, user_id)가 남아 취소한 사용자의 재구매는 DB에서 막힌다.
+KEYS stock, buyers, meta. ARGV userId. stock 또는 meta가 없으면 아무 쓰기도 하지 않고 -1을 반환한다. 둘 다 있으면 INCR stock, SREM buyers userId를 하고 meta status가 SOLD_OUT이면 OPEN으로 바꿔 1, 아니면 0을 돌려준다. 0 또는 1인 성공 뒤에만 DB 판매 상태를 동기화한다. buyers에서 빼도 DB UNIQUE(drop_id, user_id)가 남아 취소한 사용자의 재구매는 DB에서 막힌다.
+
+래퍼는 두 스크립트의 -1을 보상 실패로 다룬다. 기존 응답 코드를 유지하고 같은 `dropgate_stock_compensation_failed_total{drop}`과 error 로그를 남기며 상태 동기화는 하지 않는다. 키 유실 뒤 stock, meta, buyers를 재생성하거나 바꾸지 않고 수동 복구에 맡긴다.
 
 ### DB 판매 상태 동기화
 
