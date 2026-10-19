@@ -299,7 +299,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * 드롭 목록(SCHEDULED, OPEN, SOLD_OUT), openAt 순, 커서 페이징
+         * 드롭 목록(SCHEDULED, OPEN, SOLD_OUT), openAt 순 커서 페이징. remainingQuantity는 Redis에서, 못 읽으면 null
          * @description openAt이 같으면 id 순이다. cursor는 앞 페이지의 nextCursor를 그대로 넘기는 불투명 문자열이다. 읽을 수 없거나 저장할 수 없는 시각을 담은 cursor는 400이고 errors의 field는 cursor다.
          */
         get: {
@@ -341,7 +341,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 드롭 단건. remainingQuantity는 Redis에서, 못 읽으면 null */
+        /** 드롭 단건. remainingQuantity는 Redis에서, 키가 없거나 못 읽으면 null */
         get: {
             parameters: {
                 query?: never;
@@ -507,8 +507,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * 구매. 입장 상태여야 하고 1인 1개
-         * @description 1주 차 DB만 경로(ADR 0005)는 입장 확인을 건너뛰고, 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다. 마지막 재고를 팔면 드롭은 SOLD_OUT이 된다.
+         * 구매. 입장 확인을 켰으면 입장 상태여야 하고 1인 1개
+         * @description dropgate.order.queue.enabled가 false면 입장 확인을 건너뛴다(2주 차 기본). purchase-path=db인 DB 경로(ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다. Redis 경로는 meta OPEN과 SOLD_OUT에서 후속 검사를 이어간다. 입장 확인이 꺼져 있거나 입장 검사를 통과했으면 품절 뒤 기존 구매자는 ALREADY_PURCHASED, 신규 사용자는 SOLD_OUT이다. 입장 확인이 켜져 있고 admit 키가 없으면 NOT_ADMITTED다. meta 없음이나 마감 뒤에는 DROP_NOT_OPEN이다. 마지막 재고를 팔면 드롭은 SOLD_OUT이 된다.
          */
         post: {
             parameters: {
@@ -534,7 +534,7 @@ export interface paths {
                 };
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
-                /** @description code NOT_ADMITTED */
+                /** @description 입장 확인을 켰을 때만 code NOT_ADMITTED */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -544,7 +544,7 @@ export interface paths {
                     };
                 };
                 404: components["responses"]["NotFound"];
-                /** @description code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED. Lua 반환 순서. DB만 경로는 DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED 순 */
+                /** @description code DROP_NOT_OPEN, ALREADY_PURCHASED, SOLD_OUT. Lua 반환 순서. DB 경로(purchase-path=db)는 DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED 순 */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -911,7 +911,7 @@ export interface components {
             /** @enum {string} */
             status: "SCHEDULED" | "OPEN" | "SOLD_OUT" | "CLOSED";
             admissionRatePerSec: number;
-            /** @description Redis 재고. Redis를 읽을 수 없으면 null. 1주 차에는 Redis가 없어 항상 null(ADR 0005) */
+            /** @description Redis 재고. 단건은 stock GET, 목록은 페이지 항목 stock MGET 한 번. 키 없음(SCHEDULED, 초기화 전), Redis 실패나 200ms 초과면 null이고 200을 유지한다. purchase-path=db인 측정 드롭은 total_quantity에 머문다(ADR 0005) */
             remainingQuantity?: number | null;
         };
         DropPage: {
