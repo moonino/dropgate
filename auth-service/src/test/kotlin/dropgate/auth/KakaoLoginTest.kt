@@ -12,9 +12,12 @@ import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
 import dropgate.auth.configuration.JwtConfiguration
 import dropgate.auth.controller.KakaoCallbackController
+import dropgate.auth.controller.TokenRefreshController
 import dropgate.auth.repository.OAuthStateCookieRepository
 import dropgate.auth.repository.RefreshTokenRepository
 import dropgate.auth.service.JwtTokenService
+import dropgate.auth.service.RefreshTokenDecoder
+import dropgate.auth.service.TokenRefreshService
 import dropgate.auth.service.UserService
 import dropgate.common.error.ErrorCode
 import dropgate.common.error.GlobalExceptionHandler
@@ -28,8 +31,10 @@ import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Named
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient
@@ -53,6 +58,7 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Date
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -68,6 +74,7 @@ class KakaoLoginTest @Autowired constructor(
     private val connectionFactory: LettuceConnectionFactory,
     private val users: UserService,
     private val tokens: JwtTokenService,
+    private val refreshDecoder: RefreshTokenDecoder,
 ) : JwtIntegrationTest() {
     private val cookies = OAuthStateCookieRepository(kakao, "test-cookie-signing-key-32-bytes-long", Clock.systemUTC(), SecureRandom())
 
@@ -112,19 +119,115 @@ class KakaoLoginTest @Autowired constructor(
 
     @Test
     fun `콜백의 Redis 연결 거절은 AUTH_UNAVAILABLE과 재시도 헤더를 돌려준다`() {
-        val port = ServerSocket(0).use { it.localPort }
-        val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connectionFactory.clientConfiguration)
-        unavailable.afterPropertiesSet()
-        try {
-            val callback = KakaoCallbackController(cookies, kakao, users, tokens, RefreshTokenRepository(StringRedisTemplate(unavailable)))
-            val client = RestTestClient.bindTo(MockMvcBuilders.standaloneSetup(callback).setControllerAdvice(GlobalExceptionHandler()).build()).build()
+        withUnavailableRedis { repository ->
+            val client = createControllerClient(KakaoCallbackController(cookies, kakao, users, tokens, repository))
             stubKakaoUser("""{"id":1234567}""")
             callCallback(client = client).expectStatus().isEqualTo(503).expectHeader().valueEquals("Retry-After", "2")
                 .expectBody().jsonPath("$.code").isEqualTo("AUTH_UNAVAILABLE")
-        } finally {
-            unavailable.destroy()
         }
     }
+
+    @Test
+    fun `재발급은 옛 리프레시를 새 키와 index로 원자 교체한다`() {
+        val previous = SignedJWT.parse(requestTokenPair()["refreshToken"] as String)
+        val pair = refresh(previous.serialize()).expectStatus().isOk.expectBody(Map::class.java).returnResult().responseBody!!
+        val next = SignedJWT.parse(pair["refreshToken"] as String).jwtClaimsSet
+        val before = previous.jwtClaimsSet
+        assertThat(next.jwtid).isNotEqualTo(before.jwtid)
+        assertThat(redis.hasKey("auth:refresh:${before.subject}:${before.jwtid}")).isFalse()
+        assertThat(redis.opsForValue().get("auth:refresh:${next.subject}:${next.jwtid}")).isEqualTo("1")
+        assertThat(redis.opsForSet().members("auth:refresh-index:${next.subject}")).containsExactly(next.jwtid)
+        assertThat(redis.getExpire("auth:refresh:${next.subject}:${next.jwtid}")).isBetween(1L, Duration.ofDays(14).seconds)
+    }
+
+    @Test
+    fun `이미 쓴 리프레시로 다시 재발급하면 401이다`() {
+        val token = requestTokenPair()["refreshToken"] as String
+        refresh(token).expectStatus().isOk
+        expectUnauthenticatedResponse(refresh(token))
+    }
+
+    @Test
+    fun `같은 리프레시의 동시 재발급은 하나만 성공한다`() {
+        val token = requestTokenPair()["refreshToken"] as String
+        val statuses = Executors.newFixedThreadPool(2).use { executor ->
+            List(2) { executor.submit<Int> { refresh(token).returnResult(Void::class.java).status.value() } }.map { it.get() }
+        }
+        assertThat(statuses).containsExactlyInAnyOrder(200, 401)
+    }
+
+    @Test
+    fun `저장 키가 있어도 액세스 토큰으로 재발급하면 401이다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        val claims = SignedJWT.parse(token).jwtClaimsSet
+        redis.opsForValue().set("auth:refresh:${claims.subject}:${claims.jwtid}", "1", Duration.ofMinutes(15))
+        expectUnauthenticatedResponse(refresh(token))
+    }
+
+    @Test
+    fun `만료된 리프레시는 저장 키가 있어도 재발급할 수 없다`() {
+        expectUnauthenticatedResponse(refresh(signRefreshToken { expirationTime(Date.from(Instant.now().minusSeconds(1))) }))
+    }
+
+    @Test
+    fun `리프레시는 만료 직전까지 주입한 Clock으로 검증한다`() {
+        val token = requestTokenPair()["refreshToken"] as String
+        val claims = SignedJWT.parse(token).jwtClaimsSet
+        assertThat(refreshDecoderAt(claims.expirationTime.toInstant().minusNanos(1)).decode(token).userId).isEqualTo(UUID.fromString(claims.subject))
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = [0, 1])
+    fun `리프레시는 정확한 만료 시각부터 거부한다`(secondsAfterExpiry: Long) {
+        val token = requestTokenPair()["refreshToken"] as String
+        val expiry = SignedJWT.parse(token).jwtClaimsSet.expirationTime.toInstant()
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { refreshDecoderAt(expiry.plusSeconds(secondsAfterExpiry)).decode(token) }.hasMessageContaining("exp")
+    }
+
+    @Test
+    fun `리프레시는 nbf 직전에는 거부하고 해당 시각부터 허용한다`() {
+        val notBefore = Instant.ofEpochSecond(Instant.now().epochSecond + 60)
+        val token = signRefreshToken { notBeforeTime(Date.from(notBefore)) }
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { refreshDecoderAt(notBefore.minusNanos(1)).decode(token) }
+        assertThat(refreshDecoderAt(notBefore).decode(token).userId).isEqualTo(UUID.fromString(SignedJWT.parse(token).jwtClaimsSet.subject))
+    }
+
+    @Test
+    fun `다른 키로 서명한 리프레시를 거부한다`() {
+        expectUnauthenticatedResponse(refresh(signRefreshToken(key = JwtConfiguration().jwtSigningKey(generatePrivateKeyPem()))))
+    }
+
+    @Test
+    fun `재발급 본문에 refreshToken이 없으면 필드 오류다`() {
+        http.post().uri("/auth/token/refresh").body(emptyMap<String, String>()).exchange()
+            .expectStatus().isBadRequest.expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED")
+            .jsonPath("$.errors[0].field").isEqualTo("refreshToken")
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidRefreshClaims")
+    fun `리프레시의 필수 클레임이 없거나 틀리면 401이다`(change: JWTClaimsSet.Builder.() -> Unit) {
+        expectUnauthenticatedResponse(refresh(signRefreshToken(change = change)))
+    }
+
+    @Test
+    fun `재발급의 Redis 연결 거절은 AUTH_UNAVAILABLE이다`() {
+        val token = requestTokenPair()["refreshToken"] as String
+        withUnavailableRedis { repository ->
+            val client = createControllerClient(TokenRefreshController(TokenRefreshService(refreshDecoder, users, tokens, repository)))
+            refresh(token, client).expectStatus().isEqualTo(503).expectHeader().valueEquals("Retry-After", "2")
+                .expectBody().jsonPath("$.code").isEqualTo("AUTH_UNAVAILABLE")
+        }
+    }
+
+    private fun refresh(token: String, client: RestTestClient = http): RestTestClient.ResponseSpec = client.post().uri("/auth/token/refresh").body(mapOf("refreshToken" to token)).exchange()
+
+    private fun signRefreshToken(key: RSAKey = JwtConfiguration().jwtSigningKey(privateKeyPem), change: JWTClaimsSet.Builder.() -> Unit = {}): String {
+        val original = SignedJWT.parse(requestTokenPair()["refreshToken"] as String)
+        return SignedJWT(original.header, JWTClaimsSet.Builder(original.jwtClaimsSet).apply(change).build()).apply { sign(RSASSASigner(key)) }.serialize()
+    }
+
+    private fun refreshDecoderAt(instant: Instant): RefreshTokenDecoder = RefreshTokenDecoder(JwtConfiguration().jwtSigningKey(privateKeyPem), Clock.fixed(instant, ZoneOffset.UTC))
 
     @Test
     fun `로그인은 state 쿠키와 카카오 인가 URL을 302로 돌려준다`() {
@@ -437,6 +540,19 @@ class KakaoLoginTest @Autowired constructor(
     private fun requestJwks(): List<Map<String, Any>> = http.get().uri("/.well-known/jwks.json").exchange().expectStatus().isOk
         .expectBody(JwksTestResponse::class.java).returnResult().responseBody!!.keys
 
+    private fun withUnavailableRedis(verify: (RefreshTokenRepository) -> Unit) {
+        val port = ServerSocket(0).use { it.localPort }
+        val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connectionFactory.clientConfiguration)
+        unavailable.afterPropertiesSet()
+        try {
+            verify(RefreshTokenRepository(StringRedisTemplate(unavailable)))
+        } finally {
+            unavailable.destroy()
+        }
+    }
+
+    private fun createControllerClient(controller: Any): RestTestClient = RestTestClient.bindTo(MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(GlobalExceptionHandler()).build()).build()
+
     private fun callCallback(code: String = "code", client: RestTestClient = http): RestTestClient.ResponseSpec {
         val headers = requestLogin()
         val state = UriComponentsBuilder.fromUriString(headers.location.toString())
@@ -467,6 +583,14 @@ class KakaoLoginTest @Autowired constructor(
 
     companion object {
         private val wiremock = WireMockServer(0).apply { start() }
+
+        @JvmStatic
+        fun invalidRefreshClaims(): List<Named<JWTClaimsSet.Builder.() -> Unit>> = listOf(
+            Named.of("발급자", { issuer("other-auth") }),
+            Named.of("만료시각", { expirationTime(null) }),
+            Named.of("사용자", { subject("not-a-uuid") }),
+            Named.of("식별자", { jwtID(null) }),
+        )
 
         @JvmStatic
         @DynamicPropertySource
