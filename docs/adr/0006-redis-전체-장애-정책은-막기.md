@@ -12,6 +12,8 @@
 
 Redis 전체 장애 때 판매와 토큰 검증을 막고, 공개 조회는 남은 수량 없이 연다.
 
+2주 차 기능 검증은 단일 Redis에 host와 port로 연결하고, 3주 차에 Sentinel 로컬 구성과 클라이언트 전환을 함께 도입한다(docs/plan.md). 재고 원자성과 장애 응답을 먼저 고정하고 절체 실험을 다음 단계로 나누기 위함이다. 두 구성에서 같은 장애 정책과 클라이언트 재전송 차단을 유지한다.
+
 - 재고와 대기열 명령 실패나 200ms 초과는 503 STOCK_UNAVAILABLE, 무효화 확인과 리프레시 명령 실패는 503 AUTH_UNAVAILABLE이다. Retry-After는 2초다.
 - Bearer 엔드포인트는 내 주문 조회까지 전부 503이다. 로그인 콜백과 재발급도 리프레시 저장 때문에 503이다. 드롭 목록과 단건은 remainingQuantity만 null로 HTTP 200을 유지하고, JWKS와 로그인 시작은 계속 동작한다.
 - 초기화 권한은 drops.stock_initialization_claimed에 1회 영속 저장하고 별도 DB 트랜잭션으로 커밋한 호출만 init.lua를 실행한다. 처음 실패해도 권한을 유지하고 자동 재시도하지 않는다. meta 유실 뒤 total_quantity로 다시 만들면 기존 주문만큼 초과 판매할 수 있어 판매 차단과 수동 복구를 택한다.
