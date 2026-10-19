@@ -112,17 +112,11 @@ class KakaoLoginTest @Autowired constructor(
 
     @Test
     fun `콜백의 Redis 연결 거절은 AUTH_UNAVAILABLE과 재시도 헤더를 돌려준다`() {
-        val port = ServerSocket(0).use { it.localPort }
-        val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connectionFactory.clientConfiguration)
-        unavailable.afterPropertiesSet()
-        try {
-            val callback = KakaoCallbackController(cookies, kakao, users, tokens, RefreshTokenRepository(StringRedisTemplate(unavailable)))
-            val client = RestTestClient.bindTo(MockMvcBuilders.standaloneSetup(callback).setControllerAdvice(GlobalExceptionHandler()).build()).build()
+        withUnavailableRedis { repository ->
+            val client = createControllerClient(KakaoCallbackController(cookies, kakao, users, tokens, repository))
             stubKakaoUser("""{"id":1234567}""")
             callCallback(client = client).expectStatus().isEqualTo(503).expectHeader().valueEquals("Retry-After", "2")
                 .expectBody().jsonPath("$.code").isEqualTo("AUTH_UNAVAILABLE")
-        } finally {
-            unavailable.destroy()
         }
     }
 
@@ -436,6 +430,19 @@ class KakaoLoginTest @Autowired constructor(
 
     private fun requestJwks(): List<Map<String, Any>> = http.get().uri("/.well-known/jwks.json").exchange().expectStatus().isOk
         .expectBody(JwksTestResponse::class.java).returnResult().responseBody!!.keys
+
+    private fun withUnavailableRedis(verify: (RefreshTokenRepository) -> Unit) {
+        val port = ServerSocket(0).use { it.localPort }
+        val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connectionFactory.clientConfiguration)
+        unavailable.afterPropertiesSet()
+        try {
+            verify(RefreshTokenRepository(StringRedisTemplate(unavailable)))
+        } finally {
+            unavailable.destroy()
+        }
+    }
+
+    private fun createControllerClient(controller: Any): RestTestClient = RestTestClient.bindTo(MockMvcBuilders.standaloneSetup(controller).setControllerAdvice(GlobalExceptionHandler()).build()).build()
 
     private fun callCallback(code: String = "code", client: RestTestClient = http): RestTestClient.ResponseSpec {
         val headers = requestLogin()
