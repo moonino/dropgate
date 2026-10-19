@@ -75,7 +75,7 @@ if stock - 1 == 0 then HSET meta status 'SOLD_OUT' end
 return {stock - 1, 'OK'}
 ```
 
-meta가 없거나 status가 OPEN과 SOLD_OUT 중 하나가 아니어도 DROP_NOT_OPEN이다. SOLD_OUT도 입장, buyers, stock 검사를 이어간다. 입장 확인이 꺼져 있거나 입장 검사를 통과했으면 품절 뒤 기존 구매자는 ALREADY_PURCHASED, 신규 사용자는 SOLD_OUT이다. 입장 확인이 켜져 있고 admit 키가 없으면 buyers보다 먼저 NOT_ADMITTED다. 이 반환일 때만 서비스가 DB에서 드롭 존재를 확인해 없으면 404 DROP_NOT_FOUND, 있으면 409 DROP_NOT_OPEN으로 답한다.
+meta가 없거나 status가 OPEN과 SOLD_OUT 중 하나가 아니어도 DROP_NOT_OPEN이다. SOLD_OUT도 입장, buyers, stock 검사를 이어간다. 입장 확인이 꺼져 있거나 입장 검사를 통과했으면 품절 뒤 기존 구매자는 ALREADY_PURCHASED, 신규 사용자는 SOLD_OUT이다. 입장 확인이 켜져 있고 admit 키가 없으면 buyers보다 먼저 NOT_ADMITTED다. DROP_NOT_OPEN 반환일 때만 서비스가 DB에서 드롭 존재를 확인해 없으면 404 DROP_NOT_FOUND, 있으면 409 DROP_NOT_OPEN으로 답한다.
 
 반환 첫 값이 0 이상이면 성공이고 남은 수량이다. 성공 뒤에만 DB 트랜잭션(orders INSERT, order_ledger INSERT, outbox INSERT)을 연다. INSERT 0행(UNIQUE)이면 compensate.lua 뒤 409 ALREADY_PURCHASED, DB 예외면 compensate.lua 뒤 503 ORDER_PERSIST_FAILED다. 보상 실패는 `dropgate_stock_compensation_failed_total{drop}`과 error 로그에 남기고 응답 코드는 유지한다. 대조 배치가 불일치를 잡는다.
 
