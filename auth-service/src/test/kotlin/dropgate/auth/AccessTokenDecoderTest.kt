@@ -27,18 +27,18 @@ class AccessTokenDecoderTest {
     @Test
     fun `만료 직전까지 주입한 Clock으로 검증한다`() {
         val decoder = AccessTokenDecoder(key, Clock.offset(clock, Duration.ofMinutes(15).minusNanos(1)))
-        assertThat(decoder.decodeUserId("Bearer ${tokens.accessToken}")).isEqualTo(user.id)
+        assertThat(decoder.decode("Bearer ${tokens.accessToken}").userId).isEqualTo(user.id)
     }
 
     @ParameterizedTest
     @ValueSource(longs = [0, 1])
     fun `만료 시각부터 토큰을 거부하고 예외에 이유를 남긴다`(secondsAfterExpiry: Long) {
         val decoder = AccessTokenDecoder(key, Clock.offset(clock, Duration.ofMinutes(15).plusSeconds(secondsAfterExpiry)))
-        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { decoder.decodeUserId("Bearer ${tokens.accessToken}") }.hasMessageContaining("exp")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { decoder.decode("Bearer ${tokens.accessToken}") }.hasMessageContaining("exp")
     }
 
     @Test
     fun `리프레시 토큰을 거부한 이유를 예외에 남긴다`() {
-        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { AccessTokenDecoder(key, clock).decodeUserId("Bearer ${tokens.refreshToken}") }.hasMessageContaining("리프레시 토큰")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { AccessTokenDecoder(key, clock).decode("Bearer ${tokens.refreshToken}") }.hasMessageContaining("리프레시 토큰")
     }
 }

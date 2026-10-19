@@ -12,11 +12,14 @@ import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
 import dropgate.auth.configuration.JwtConfiguration
 import dropgate.auth.controller.KakaoCallbackController
+import dropgate.auth.controller.LogoutController
 import dropgate.auth.controller.TokenRefreshController
 import dropgate.auth.repository.OAuthStateCookieRepository
 import dropgate.auth.repository.RefreshTokenRepository
+import dropgate.auth.service.AccessTokenDecoder
 import dropgate.auth.service.JwtTokenService
 import dropgate.auth.service.RefreshTokenDecoder
+import dropgate.auth.service.TokenLogoutService
 import dropgate.auth.service.TokenRefreshService
 import dropgate.auth.service.UserService
 import dropgate.common.error.ErrorCode
@@ -62,6 +65,7 @@ import java.time.ZoneOffset
 import java.util.Date
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
@@ -75,6 +79,7 @@ class KakaoLoginTest @Autowired constructor(
     private val users: UserService,
     private val tokens: JwtTokenService,
     private val refreshDecoder: RefreshTokenDecoder,
+    private val accessDecoder: AccessTokenDecoder,
 ) : JwtIntegrationTest() {
     private val cookies = OAuthStateCookieRepository(kakao, "test-cookie-signing-key-32-bytes-long", Clock.systemUTC(), SecureRandom())
 
@@ -219,6 +224,70 @@ class KakaoLoginTest @Autowired constructor(
                 .expectBody().jsonPath("$.code").isEqualTo("AUTH_UNAVAILABLE")
         }
     }
+
+    @Test
+    fun `로그아웃은 액세스 식별자를 잔여 만료 안의 TTL로 무효화한다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        val claims = SignedJWT.parse(token).jwtClaimsSet
+        val remaining = Duration.between(Instant.now(), claims.expirationTime.toInstant()).toMillis()
+        logout(token).expectStatus().isNoContent
+        assertThat(redis.opsForValue().get("auth:revoked:${claims.jwtid}")).isEqualTo("1")
+        assertThat(redis.getExpire("auth:revoked:${claims.jwtid}", TimeUnit.MILLISECONDS)).isBetween(1L, remaining)
+    }
+
+    @Test
+    fun `로그아웃은 그 사용자의 리프레시 키와 index를 모두 없앤다`() {
+        val first = requestTokenPair()
+        val second = requestTokenPair()
+        val before = listOf(first, second).map { SignedJWT.parse(it["refreshToken"] as String).jwtClaimsSet }
+        logout(first["accessToken"] as String).expectStatus().isNoContent
+        before.forEach { assertThat(redis.hasKey("auth:refresh:${it.subject}:${it.jwtid}")).isFalse() }
+        assertThat(redis.hasKey("auth:refresh-index:${before.first().subject}")).isFalse()
+    }
+
+    @Test
+    fun `로그아웃 뒤 그 리프레시를 재발급할 수 없다`() {
+        val pair = requestTokenPair()
+        logout(pair["accessToken"] as String).expectStatus().isNoContent
+        expectUnauthenticatedResponse(refresh(pair["refreshToken"] as String))
+    }
+
+    @Test
+    fun `인증 헤더 없이 로그아웃하면 401이다`() {
+        expectUnauthenticatedResponse(http.post().uri("/auth/logout").exchange())
+    }
+
+    @Test
+    fun `리프레시 토큰으로 로그아웃하면 401이다`() {
+        expectUnauthenticatedResponse(logout(requestTokenPair()["refreshToken"] as String))
+    }
+
+    @Test
+    fun `만료된 액세스 토큰으로 로그아웃하면 401이다`() {
+        expectUnauthenticatedResponse(logout(signAccessToken { expirationTime(Date.from(Instant.now().minusSeconds(1))) }))
+    }
+
+    @Test
+    fun `로그아웃의 Redis 연결 거절은 AUTH_UNAVAILABLE이다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        withUnavailableRedis { repository ->
+            val client = createControllerClient(LogoutController(accessDecoder, TokenLogoutService(repository, Clock.systemUTC())))
+            logout(token, client).expectStatus().isEqualTo(503).expectHeader().valueEquals("Retry-After", "2")
+                .expectBody().jsonPath("$.code").isEqualTo("AUTH_UNAVAILABLE")
+        }
+    }
+
+    @Test
+    fun `검증 뒤 만료된 토큰은 Redis 로그아웃 쓰기 전에 거절한다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        val expiry = SignedJWT.parse(token).jwtClaimsSet.expirationTime.toInstant()
+        withUnavailableRedis { repository ->
+            val client = createControllerClient(LogoutController(accessDecoder, TokenLogoutService(repository, Clock.fixed(expiry, ZoneOffset.UTC))))
+            expectUnauthenticatedResponse(logout(token, client))
+        }
+    }
+
+    private fun logout(token: String, client: RestTestClient = http): RestTestClient.ResponseSpec = client.post().uri("/auth/logout").header(HttpHeaders.AUTHORIZATION, "Bearer $token").exchange()
 
     private fun refresh(token: String, client: RestTestClient = http): RestTestClient.ResponseSpec = client.post().uri("/auth/token/refresh").body(mapOf("refreshToken" to token)).exchange()
 
