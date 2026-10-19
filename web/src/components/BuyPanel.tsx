@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 import type { Drop } from "@/api/types";
 import { decideBuyButton, type PurchaseOutcome } from "@/domain/purchase";
 import { appendRetryAfter } from "@/domain/retry";
+import type { SessionActionResult } from "@/domain/session-action";
 import { formatKstStamp, formatKstTime } from "@/domain/time";
+import { navigateToSessionRecovery } from "./session-navigation";
 
 type BuyPanelProps = {
   drop: Pick<Drop, "id" | "status" | "openAt">;
   signedIn: boolean;
-  purchase: (dropId: string) => Promise<PurchaseOutcome>;
+  purchase: (dropId: string) => Promise<SessionActionResult<PurchaseOutcome>>;
 };
 
 export function BuyPanel({ drop, signedIn, purchase }: BuyPanelProps) {
@@ -26,7 +28,11 @@ export function BuyPanel({ drop, signedIn, purchase }: BuyPanelProps) {
     );
   }
 
-  const buy = () => startTransition(async () => setOutcome(await purchase(drop.id)));
+  const buy = () => startTransition(async () => {
+    const result = await purchase(drop.id);
+    if (result.kind === "refresh-required") return navigateToSessionRecovery();
+    setOutcome(result);
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

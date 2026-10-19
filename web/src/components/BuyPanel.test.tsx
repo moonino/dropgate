@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createDrop } from "@/test/fixtures";
 import { BuyPanel } from "./BuyPanel";
+import { navigateToSessionRecovery } from "./session-navigation";
+
+vi.mock("./session-navigation", () => ({ navigateToSessionRecovery: vi.fn() }));
 
 const CONFIRMED = { kind: "confirmed", orderId: "0192f0a0-0000-7000-8000-0000c3a1beef", confirmedAt: "2026-10-17T10:30:02.000Z" } as const;
 const SOLD_OUT = { kind: "rejected", code: "SOLD_OUT", message: "재고가 모두 소진됐습니다", retryAfterSeconds: undefined } as const;
@@ -13,6 +16,11 @@ async function buyWith(outcome: unknown): Promise<void> {
 }
 
 describe("BuyPanel", () => {
+  it("재발급이 필요하면 현재 화면 기준으로 이동한다", async () => {
+    await buyWith({ kind: "refresh-required" });
+    expect(navigateToSessionRecovery).toHaveBeenCalledOnce();
+  });
+
   it("로그인하지 않았으면 로그인 링크를 보여 준다", () => {
     render(<BuyPanel drop={createDrop()} signedIn={false} purchase={vi.fn()} />);
 
