@@ -1,5 +1,3 @@
 package dropgate.order.service
 
-import dropgate.order.entity.DropEntity
-
-data class DropPage(val items: List<DropEntity>, val nextCursor: String?)
+data class DropPage(val items: List<DropWithStock>, val nextCursor: String?)

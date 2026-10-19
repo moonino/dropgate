@@ -29,7 +29,7 @@ class DropQueryTest : DropApiIntegrationTest() {
     }
 
     @Test
-    fun `Redis 재고를 아직 읽지 않으므로 단건의 remainingQuantity는 null이다`() {
+    fun `Redis 키가 없는 단건의 remainingQuantity는 null이다`() {
         val dropId = insertDrop()
 
         http.get().uri("/api/drops/$dropId").exchange()

@@ -6,12 +6,13 @@ import dropgate.common.error.ErrorCode
 import dropgate.order.entity.DropEntity
 import dropgate.order.entity.DropStatus
 import dropgate.order.repository.DropRepository
+import dropgate.order.repository.DropStockReader
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
-class DropService(private val drops: DropRepository, private val identifiers: UuidV7Generator) {
+class DropService(private val drops: DropRepository, private val identifiers: UuidV7Generator, private val stocks: DropStockReader) {
     @Transactional
     fun createDrop(command: CreateDropCommand, adminId: UUID): DropEntity {
         val drop = DropEntity(
@@ -29,7 +30,10 @@ class DropService(private val drops: DropRepository, private val identifiers: Uu
     }
 
     @Transactional(readOnly = true)
-    fun getDrop(id: UUID): DropEntity = drops.findById(id).orElseThrow { DropgateException(ErrorCode.DROP_NOT_FOUND, "드롭이 없습니다: $id") }
+    fun getDrop(id: UUID): DropWithStock {
+        val drop = drops.findById(id).orElseThrow { DropgateException(ErrorCode.DROP_NOT_FOUND, "드롭이 없습니다: $id") }
+        return DropWithStock(drop, stocks.readStock(id))
+    }
 
     @Transactional(readOnly = true)
     fun getFirstDrops(limit: Int): DropPage = toPage(drops.findListedDrops(limit + 1), limit)
@@ -40,6 +44,7 @@ class DropService(private val drops: DropRepository, private val identifiers: Uu
     private fun toPage(fetched: List<DropEntity>, limit: Int): DropPage {
         val items = fetched.take(limit)
         val nextCursor = if (fetched.size > limit) DropCursor(items.last().openAt, items.last().id).encode() else null
-        return DropPage(items, nextCursor)
+        val stocksById = stocks.readStocks(items.map { it.id })
+        return DropPage(items.map { DropWithStock(it, stocksById.getValue(it.id)) }, nextCursor)
     }
 }
