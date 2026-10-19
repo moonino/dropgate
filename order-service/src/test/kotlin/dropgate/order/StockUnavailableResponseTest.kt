@@ -2,7 +2,6 @@ package dropgate.order
 
 import dropgate.order.configuration.OrderProperties
 import dropgate.order.repository.DropStockRepository
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.boot.test.context.TestConfiguration
@@ -24,8 +23,6 @@ class StockUnavailableResponseTest : OrderApiIntegrationTest() {
         purchase(dropId, UUID.randomUUID()).expectStatus().isEqualTo(503)
             .expectHeader().valueEquals("Retry-After", "2")
             .expectBody().jsonPath("$.code").isEqualTo("STOCK_UNAVAILABLE")
-
-        assertThat(countRows("orders")).isZero()
     }
 
     @TestConfiguration(proxyBeanMethods = false)

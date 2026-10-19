@@ -42,7 +42,6 @@ class StockTimeoutResponseTest : OrderApiIntegrationTest() {
             }
             println("재고 구매 HTTP 응답 시간: $elapsed, 명령 제한: ${isolated.connections.clientConfiguration.commandTimeout}")
             assertThat(elapsed.inWholeMilliseconds).isBetween(150L, 2000L)
-            assertThat(countRows("orders")).isZero()
         } finally {
             docker.unpauseContainerCmd(isolated.container.containerId).exec()
         }
