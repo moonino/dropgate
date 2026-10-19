@@ -2,11 +2,13 @@ package dropgate.order
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.springframework.http.HttpHeaders
+import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.client.RestTestClient
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 
+@TestPropertySource(properties = ["dropgate.order.purchase-path=db"])
 abstract class OrderApiIntegrationTest : DropApiIntegrationTest() {
     fun insertDropWithStock(
         status: String = "OPEN",

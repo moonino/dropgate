@@ -12,7 +12,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 @Service
-class OrderCancelService(
+class DbOrderCancelService(
     private val orders: OrderRepository,
     private val drops: DropRepository,
     private val history: OrderHistoryRecorder,

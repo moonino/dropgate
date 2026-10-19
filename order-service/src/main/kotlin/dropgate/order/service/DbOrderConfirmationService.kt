@@ -16,7 +16,7 @@ import java.util.UUID
 private const val NO_ROWS = 0
 
 @Service
-class OrderConfirmationService(
+class DbOrderConfirmationService(
     private val drops: DropRepository,
     private val orders: OrderRepository,
     private val history: OrderHistoryRecorder,

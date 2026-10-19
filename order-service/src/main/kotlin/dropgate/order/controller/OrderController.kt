@@ -4,9 +4,8 @@ import dropgate.common.authentication.AuthenticatedUser
 import dropgate.order.dto.OrderPageResponse
 import dropgate.order.dto.OrderResponse
 import dropgate.order.service.MyOrderService
-import dropgate.order.service.OrderCancelService
 import dropgate.order.service.OrderCursor
-import dropgate.order.service.PurchaseService
+import dropgate.order.service.PurchaseFlow
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import org.springframework.http.ResponseEntity
@@ -23,15 +22,15 @@ private const val MIN_PAGE_LIMIT = 1L
 private const val MAX_PAGE_LIMIT = 100L
 
 @RestController
-class OrderController(private val purchases: PurchaseService, private val cancellations: OrderCancelService, private val myOrders: MyOrderService) {
+class OrderController(private val purchaseFlow: PurchaseFlow, private val myOrders: MyOrderService) {
     @PostMapping("/api/drops/{dropId}/orders")
     fun purchase(user: AuthenticatedUser, @PathVariable("dropId") dropId: UUID): ResponseEntity<OrderResponse> {
-        val order = OrderResponse.createFrom(purchases.purchase(dropId, user.id))
+        val order = OrderResponse.createFrom(purchaseFlow.purchase(dropId, user.id))
         return ResponseEntity.created(URI.create("/api/orders/${order.id}")).body(order)
     }
 
     @PostMapping("/api/orders/{orderId}/cancel")
-    fun cancel(user: AuthenticatedUser, @PathVariable("orderId") orderId: UUID): OrderResponse = OrderResponse.createFrom(cancellations.cancel(orderId, user.id))
+    fun cancel(user: AuthenticatedUser, @PathVariable("orderId") orderId: UUID): OrderResponse = OrderResponse.createFrom(purchaseFlow.cancel(orderId, user.id))
 
     @GetMapping("/api/orders/me")
     fun getMyOrders(
