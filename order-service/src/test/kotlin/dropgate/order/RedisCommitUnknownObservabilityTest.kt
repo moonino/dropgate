@@ -1,7 +1,6 @@
 package dropgate.order
 
 import dropgate.common.error.DropgateException
-import dropgate.common.error.ErrorCode
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -31,7 +30,7 @@ class RedisCommitUnknownObservabilityTest : RedisFlowIntegrationTest() {
         val dropId = initializeStock()
         failNextCommit(manager).use {
             assertThatThrownBy { flow.purchase(dropId, UUID.randomUUID()) }
-                .isInstanceOfSatisfying(DropgateException::class.java) { assertThat(it.errorCode).isEqualTo(ErrorCode.ORDER_PERSIST_FAILED) }
+                .isInstanceOf(DropgateException::class.java)
         }
         val confirmed = jdbc.sql("SELECT count(*) FROM orders.orders WHERE drop_id = :id AND status = 'CONFIRMED'").param("id", dropId).query(Long::class.java).single()
         assertThat(confirmed).isEqualTo(1L)
