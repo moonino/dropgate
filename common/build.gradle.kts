@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     compileOnly(libs.spring.boot.starter.webmvc)
+    compileOnly(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.security.oauth2.jose)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.spring.boot.starter.webmvc)

@@ -76,7 +76,7 @@ class JwtAuthenticationFilterTest {
     }
 
     private fun filter(fetcher: JwkSetFetcher = JwkSetFetcher { issuer.createJwkSetJson() }) = JwtAuthenticationFilter(
-        AccessTokenVerifier(JwkSetCache(fetcher, clock), clock),
+        AccessTokenVerifier(JwkSetCache(fetcher, clock), clock, InMemoryRevokedAccessTokens()),
         publicEndpoints,
         ErrorResponseWriter(jsonMapper),
     )

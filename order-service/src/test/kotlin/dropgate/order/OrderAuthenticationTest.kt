@@ -11,6 +11,7 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTe
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT
 import org.springframework.context.annotation.Import
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -18,12 +19,23 @@ import org.springframework.test.web.servlet.client.RestTestClient
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Clock
+import java.time.Duration
 import java.util.UUID
 
 @SpringBootTest(webEnvironment = RANDOM_PORT)
 @AutoConfigureRestTestClient
 @Import(PostgresTestcontainersConfiguration::class, OrderAuthenticationTest.AuthenticationProbeController::class)
-class OrderAuthenticationTest @Autowired constructor(private val http: RestTestClient) {
+class OrderAuthenticationTest @Autowired constructor(private val http: RestTestClient, private val redis: StringRedisTemplate) {
+    @Test
+    fun `같은 토큰도 무효화 키를 저장한 직후 내 주문 조회에서 거부한다`() {
+        val tokenId = UUID.randomUUID().toString()
+        val token = issuer.issueAccessToken(tokenId = tokenId)
+        http.get().uri("/api/orders/me").header(HttpHeaders.AUTHORIZATION, "Bearer $token").exchange().expectStatus().isOk
+        redis.opsForValue().set("auth:revoked:$tokenId", "1", Duration.ofMinutes(15))
+        http.get().uri("/api/orders/me").header(HttpHeaders.AUTHORIZATION, "Bearer $token").exchange()
+            .expectStatus().isUnauthorized.expectBody().jsonPath("$.code").isEqualTo("UNAUTHENTICATED")
+    }
+
     @Test
     fun `토큰 없이 Bearer 엔드포인트를 부르면 401 UNAUTHENTICATED를 돌려준다`() {
         http.get().uri(PROBE_PATH).exchange()
