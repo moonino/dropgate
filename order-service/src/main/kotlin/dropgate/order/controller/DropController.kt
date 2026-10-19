@@ -4,8 +4,10 @@ import dropgate.common.authentication.AuthenticatedUser
 import dropgate.order.dto.CreateDropRequest
 import dropgate.order.dto.DropPageResponse
 import dropgate.order.dto.DropResponse
+import dropgate.order.repository.RemainingStock
 import dropgate.order.service.DropCursor
 import dropgate.order.service.DropService
+import dropgate.order.service.DropWithStock
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -40,9 +42,16 @@ class DropController(private val drops: DropService) {
         limit: Int,
     ): DropPageResponse {
         val page = if (cursor == null) drops.getFirstDrops(limit) else drops.getDropsAfter(DropCursor.decode(cursor), limit)
-        return DropPageResponse(page.items.map(DropResponse::createWithoutStock), page.nextCursor)
+        return DropPageResponse(page.items.map(::toResponse), page.nextCursor)
     }
 
     @GetMapping("/api/drops/{dropId}")
-    fun getDrop(@PathVariable("dropId") dropId: UUID): DropResponse = DropResponse.createWithoutStock(drops.getDrop(dropId))
+    fun getDrop(@PathVariable("dropId") dropId: UUID): DropResponse = toResponse(drops.getDrop(dropId))
+    private fun toResponse(value: DropWithStock): DropResponse = DropResponse.create(
+        value.drop,
+        when (val stock = value.stock) {
+            is RemainingStock.Known -> stock.quantity
+            RemainingStock.Unknown -> null
+        },
+    )
 }

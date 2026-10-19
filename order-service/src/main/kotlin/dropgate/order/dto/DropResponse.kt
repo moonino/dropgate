@@ -19,7 +19,9 @@ data class DropResponse(
     val remainingQuantity: Int?,
 ) {
     companion object {
-        fun createWithoutStock(drop: DropEntity) = DropResponse(
+        fun createWithoutStock(drop: DropEntity) = create(drop, null)
+
+        fun create(drop: DropEntity, remainingQuantity: Int?) = DropResponse(
             drop.id,
             drop.name,
             drop.totalQuantity,
@@ -27,7 +29,7 @@ data class DropResponse(
             drop.closeAt,
             drop.status,
             drop.admissionRatePerSec,
-            remainingQuantity = null,
+            remainingQuantity = remainingQuantity,
         )
     }
 }

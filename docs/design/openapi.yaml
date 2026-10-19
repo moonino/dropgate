@@ -86,7 +86,7 @@ components:
         admissionRatePerSec: { type: integer }
         remainingQuantity:
           type: [integer, "null"]
-          description: Redis 재고. 단건은 stock GET, 목록은 페이지 항목 stock MGET 한 번. 키 없음(SCHEDULED, 초기화 전), Redis 실패나 200ms 초과면 null이고 200을 유지한다. purchase-path=db인 측정 드롭은 total_quantity에 머문다(ADR 0005)
+          description: 현재 남은 수량. 키 없음(SCHEDULED, 초기화 전), Redis 실패나 200ms 초과면 null이고 200을 유지한다. purchase-path=db인 측정 드롭은 total_quantity에 머문다(ADR 0005)
     DropPage:
       type: object
       required: [items, nextCursor]
