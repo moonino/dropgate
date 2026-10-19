@@ -1,9 +1,9 @@
 package dropgate.auth
 
 import dropgate.auth.configuration.JwtConfiguration
+import dropgate.auth.entity.UserEntity
 import dropgate.auth.service.AccessTokenDecoder
 import dropgate.auth.service.JwtTokenService
-import dropgate.auth.service.UserResponse
 import dropgate.common.UuidV7Generator
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
@@ -22,7 +22,7 @@ import java.util.UUID
 class AccessTokenDecoderTest {
     private val clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)
     private val key = JwtConfiguration().jwtSigningKey(JwtIntegrationTest.privateKeyPem)
-    private val user = UserResponse(UUID.randomUUID(), "테스터", "USER")
+    private val user = UserEntity(UUID.randomUUID(), 1234567, "테스터", "USER", clock.instant(), clock.instant())
     private val tokens = JwtTokenService(key, UuidV7Generator(clock, SecureRandom()), clock).issueTokenPair(user)
 
     @Test

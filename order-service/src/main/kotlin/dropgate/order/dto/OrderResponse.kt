@@ -1,8 +1,10 @@
-package dropgate.order.service
+package dropgate.order.dto
 
 import com.fasterxml.jackson.annotation.JsonFormat
-import dropgate.order.entity.OrderEntity
+import dropgate.order.UTC_JSON_TIMEZONE
+import dropgate.order.UTC_MILLIS_JSON_PATTERN
 import dropgate.order.entity.OrderStatus
+import dropgate.order.service.OrderWithDropName
 import java.time.Instant
 import java.util.UUID
 
@@ -16,6 +18,8 @@ data class OrderResponse(
     @field:JsonFormat(shape = JsonFormat.Shape.STRING, pattern = UTC_MILLIS_JSON_PATTERN, timezone = UTC_JSON_TIMEZONE) val canceledAt: Instant?,
 ) {
     companion object {
-        fun createFrom(order: OrderEntity, dropName: String) = OrderResponse(order.id, order.dropId, dropName, order.quantity, order.status, order.confirmedAt, order.canceledAt)
+        fun createFrom(namedOrder: OrderWithDropName): OrderResponse = with(namedOrder.order) {
+            OrderResponse(id, dropId, namedOrder.dropName, quantity, status, confirmedAt, canceledAt)
+        }
     }
 }

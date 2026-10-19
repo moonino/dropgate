@@ -1,20 +1,19 @@
-package dropgate.order.service
+package dropgate.order.dto
 
 import com.fasterxml.jackson.annotation.JsonFormat
+import dropgate.order.UTC_JSON_TIMEZONE
+import dropgate.order.UTC_MILLIS_JSON_PATTERN
 import dropgate.order.entity.DropEntity
 import dropgate.order.entity.DropStatus
 import java.time.Instant
 import java.util.UUID
 
-private const val UTC_MILLIS_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSSX"
-private const val UTC = "UTC"
-
 data class DropResponse(
     val id: UUID,
     val name: String,
     val totalQuantity: Int,
-    @field:JsonFormat(shape = JsonFormat.Shape.STRING, pattern = UTC_MILLIS_PATTERN, timezone = UTC) val openAt: Instant,
-    @field:JsonFormat(shape = JsonFormat.Shape.STRING, pattern = UTC_MILLIS_PATTERN, timezone = UTC) val closeAt: Instant,
+    @field:JsonFormat(shape = JsonFormat.Shape.STRING, pattern = UTC_MILLIS_JSON_PATTERN, timezone = UTC_JSON_TIMEZONE) val openAt: Instant,
+    @field:JsonFormat(shape = JsonFormat.Shape.STRING, pattern = UTC_MILLIS_JSON_PATTERN, timezone = UTC_JSON_TIMEZONE) val closeAt: Instant,
     val status: DropStatus,
     val admissionRatePerSec: Int,
     val remainingQuantity: Int?,

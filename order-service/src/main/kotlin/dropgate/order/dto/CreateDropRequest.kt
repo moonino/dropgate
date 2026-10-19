@@ -1,4 +1,4 @@
-package dropgate.order.controller
+package dropgate.order.dto
 
 import dropgate.common.error.MISSING_VALUE_MESSAGE
 import dropgate.order.service.CreateDropCommand
