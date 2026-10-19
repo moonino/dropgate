@@ -40,7 +40,7 @@ class RedisPurchaseFlow(
             log.error("드롭 {} 사용자 {} 의 DB 커밋 결과가 불확실합니다. 예약을 유지하며 수동 대조가 필요합니다", dropId, userId, exception)
             throw DropgateException(ErrorCode.ORDER_PERSIST_FAILED, "드롭 $dropId 사용자 $userId 의 주문 확정 결과를 확인하지 못했습니다", cause = exception)
         }
-        synchronizeSaleStatus(dropId)
+        trySynchronizeSaleStatus(dropId)
         return confirmed
     }
 
@@ -63,10 +63,10 @@ class RedisPurchaseFlow(
             log.error("드롭 {} 사용자 {} 의 재고 복구에 실패했습니다. 원래 응답을 유지하고 수동 대조가 필요합니다", dropId, userId, exception)
             return
         }
-        synchronizeSaleStatus(dropId)
+        trySynchronizeSaleStatus(dropId)
     }
 
-    private fun synchronizeSaleStatus(dropId: UUID) {
+    private fun trySynchronizeSaleStatus(dropId: UUID) {
         try {
             statuses.synchronizeSaleStatus(dropId)
         } catch (exception: RuntimeException) {

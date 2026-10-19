@@ -37,15 +37,10 @@ class RedisCommitUnknownTest : RedisFlowIntegrationTest() {
         val dropId = initializeStock()
         val userId = UUID.randomUUID()
         val wrapped = OrderConfirmationRolledBackException(ErrorCode.ALREADY_PURCHASED, dropId, userId, IllegalStateException("롤백 대상"))
-        jdbc.sql("CREATE FUNCTION orders.reject_order() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''test failure''; END'").update()
-        jdbc.sql("CREATE TRIGGER reject_order BEFORE INSERT ON orders.orders FOR EACH ROW EXECUTE FUNCTION orders.reject_order()").update()
-        try {
+        jdbc.withRejectedInserts("orders") {
             failNextRollback(manager, wrapped).use {
                 expectPersistenceFailure { flow.purchase(dropId, userId) }
             }
-        } finally {
-            jdbc.sql("DROP TRIGGER reject_order ON orders.orders").update()
-            jdbc.sql("DROP FUNCTION orders.reject_order()").update()
         }
 
         assertThat(readStock(dropId)).isEqualTo("0")
