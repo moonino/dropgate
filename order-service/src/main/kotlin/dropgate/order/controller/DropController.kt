@@ -47,6 +47,7 @@ class DropController(private val drops: DropService) {
 
     @GetMapping("/api/drops/{dropId}")
     fun getDrop(@PathVariable("dropId") dropId: UUID): DropResponse = toResponse(drops.getDrop(dropId))
+
     private fun toResponse(dropWithStock: DropWithStock): DropResponse = DropResponse.create(
         dropWithStock.drop,
         when (val stock = dropWithStock.stock) {

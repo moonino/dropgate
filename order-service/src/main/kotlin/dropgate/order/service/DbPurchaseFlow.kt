@@ -1,6 +1,7 @@
 package dropgate.order.service
 
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.TransactionException
@@ -9,6 +10,7 @@ import java.util.UUID
 private val log = LoggerFactory.getLogger(DbPurchaseFlow::class.java)
 
 @Service
+@ConditionalOnProperty(prefix = "dropgate.order", name = ["purchase-path"], havingValue = "db")
 class DbPurchaseFlow(
     private val confirmations: DbOrderConfirmationService,
     private val cancellations: DbOrderCancelService,

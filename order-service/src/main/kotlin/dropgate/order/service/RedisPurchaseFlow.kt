@@ -7,6 +7,8 @@ import dropgate.order.repository.DropStockRepository
 import dropgate.order.repository.StockReservation
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.stereotype.Service
 import java.time.Clock
 import java.util.UUID
 
@@ -14,6 +16,8 @@ private const val COMPENSATION_FAILED_METRIC = "dropgate_stock_compensation_fail
 private const val COMMIT_UNKNOWN_METRIC = "dropgate_order_commit_unknown_total"
 private val log = LoggerFactory.getLogger(RedisPurchaseFlow::class.java)
 
+@Service
+@ConditionalOnProperty(prefix = "dropgate.order", name = ["purchase-path"], havingValue = "redis", matchIfMissing = true)
 class RedisPurchaseFlow(
     private val stocks: DropStockRepository,
     private val confirmations: RedisOrderConfirmationService,

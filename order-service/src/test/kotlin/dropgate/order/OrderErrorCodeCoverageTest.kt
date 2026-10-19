@@ -28,9 +28,9 @@ class OrderErrorCodeCoverageTest {
             ErrorCode.AUTH_UNAVAILABLE to OrderJwksUnavailableTest::class,
             ErrorCode.STOCK_UNAVAILABLE to StockUnavailableResponseTest::class,
             ErrorCode.ORDER_PERSIST_FAILED to RedisPersistenceResponseTest::class,
+            ErrorCode.NOT_ADMITTED to RedisAdmissionResponseTest::class,
         )
         val OUT_OF_SCOPE = mapOf(
-            ErrorCode.NOT_ADMITTED to "입장 확인은 3주 차 대기열과 함께 붙는다(ADR 0005)",
             ErrorCode.JOB_EXECUTION_NOT_FOUND to "settlement-batch의 코드다",
             ErrorCode.JOB_ALREADY_RUNNING to "settlement-batch의 코드다",
             ErrorCode.KAKAO_UNAVAILABLE to "auth-service의 코드다",

@@ -105,7 +105,7 @@ KEYS stock, buyers, meta. ARGV userId. stock 또는 meta가 없으면 아무 쓰
 
 마지막 구매만 호출하면 앞서 예약한 구매가 늦게 확정된 뒤 DB가 OPEN으로 남을 수 있다. 단순한 조건부 상태 UPDATE도 지연된 구매 갱신이 취소를 덮거나 보상 뒤 SOLD_OUT이 남는 경쟁을 막지 못한다. 모든 성공 확정과 보상, 취소가 같은 동기화를 호출한다(ADR 0007).
 
-`dropgate.order.purchase-path`(`DROPGATE_PURCHASE_PATH`)는 redis(기본) 또는 db로 구매와 취소 구현을 함께 고른다. 바꿔 끼우는 단위는 구매 흐름 전체다(ADR 0005). 구현을 나누어 병합하는 중간 PR은 DB 흐름과 db 기본값을 유지한다. Lua, DB 저장 실패와 보상, 판매 상태 동기화 및 취소 검증을 마친 최종 활성화 PR에서 구매와 취소 조립 및 기본값을 함께 redis로 바꾼다(ADR 0022).
+`dropgate.order.purchase-path`(`DROPGATE_PURCHASE_PATH`)는 redis(기본) 또는 db로 구매와 취소 구현을 함께 고른다. 바꿔 끼우는 단위는 구매 흐름 전체다(ADR 0005). DB 기준선은 db로 선택한다. 구현 분할 중 DB 기본값을 유지한 뒤 구매와 취소를 함께 Redis로 활성화한 순서는 ADR 0022에 기록한다.
 
 ### Redis 전체 장애 정책
 
