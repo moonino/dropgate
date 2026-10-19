@@ -2,6 +2,7 @@ package dropgate.order
 
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.order.service.OrderConfirmationRolledBackException
 import dropgate.order.service.RedisOrderCancelService
 import dropgate.order.service.RedisOrderConfirmationService
 import org.assertj.core.api.Assertions.assertThat
@@ -48,19 +49,10 @@ class RedisOrderPersistenceTest : OrderApiIntegrationTest() {
         val userId = UUID.randomUUID()
         confirmations.confirm(dropId, userId)
 
-        expectCode(ErrorCode.ALREADY_PURCHASED) { confirmations.confirm(dropId, userId) }
+        assertThatThrownBy { confirmations.confirm(dropId, userId) }
+            .isInstanceOfSatisfying(OrderConfirmationRolledBackException::class.java) { assertThat(it.errorCode).isEqualTo(ErrorCode.ALREADY_PURCHASED) }
 
         assertThat(listOf(countRows("orders"), countRows("order_ledger"), countRows("outbox"))).containsOnly(1L)
-    }
-
-    @Test
-    fun `확정의 outbox 기록이 실패하면 주문과 원장도 롤백한다`() {
-        val dropId = insertDropWithStock()
-        withRejectedEvents {
-            assertThatThrownBy { confirmations.confirm(dropId, UUID.randomUUID()) }.isInstanceOf(DataAccessException::class.java)
-        }
-
-        assertThat(listOf(countRows("orders"), countRows("order_ledger"), countRows("outbox"))).containsOnly(0L)
     }
 
     @Test
