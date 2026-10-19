@@ -96,7 +96,7 @@ class AccessTokenVerifierTest {
     }
 
     @Test
-    fun `알 수 없는 역할의 토큰을 거부한다`() {
+    fun `잘못된 역할은 Redis 무효화 확인 전에 거부한다`() {
         assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { claim("role", "ROOT") }) }.hasMessageContaining("role")
         assertThat(revoked.lookupCount).isZero()
     }

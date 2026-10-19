@@ -25,9 +25,13 @@ class AccessTokenVerifier(private val jwkSetCache: JwkSetCache, private val cloc
         val claims = readClaims(jwt)
         verifyClaims(claims)
         val user = readUser(claims)
+        verifyNotRevoked(claims)
+        return user
+    }
+
+    private fun verifyNotRevoked(claims: JWTClaimsSet) {
         val tokenId = claims.jwtid?.takeIf { it.isNotBlank() } ?: throw createVerificationFailure("토큰에 유효한 식별자 jti가 없습니다")
         if (revokedAccessTokens.isRevoked(tokenId)) throw createVerificationFailure("토큰 식별자 jti $tokenId 는 무효화됐습니다")
-        return user
     }
 
     private fun parse(token: String): SignedJWT = try {
