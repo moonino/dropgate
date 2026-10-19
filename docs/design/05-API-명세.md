@@ -43,7 +43,7 @@
 | 400 | VALIDATION_FAILED | 전부 | errors에 필드별 메시지 |
 | 401 | UNAUTHENTICATED | 전부 | 토큰 없음, 만료, 서명 불일치, 무효화됨, 리프레시 없음 |
 | 403 | FORBIDDEN | 관리자 API, 타인 주문 취소 | |
-| 403 | NOT_ADMITTED | 구매 | 입장 전이거나 입장 60초 만료. 대기열 확인이 꺼져 있으면 나오지 않음 |
+| 403 | NOT_ADMITTED | 구매 | 입장 전이거나 입장 60초 만료. 입장 확인이 꺼져 있으면 나오지 않음 |
 | 404 | DROP_NOT_FOUND | 드롭 | |
 | 404 | ORDER_NOT_FOUND | 주문 | |
 | 404 | JOB_EXECUTION_NOT_FOUND | 배치 | |
