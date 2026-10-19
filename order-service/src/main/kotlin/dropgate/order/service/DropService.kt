@@ -44,7 +44,7 @@ class DropService(private val drops: DropRepository, private val identifiers: Uu
     private fun toPage(fetched: List<DropEntity>, limit: Int): DropPage {
         val items = fetched.take(limit)
         val nextCursor = if (fetched.size > limit) DropCursor(items.last().openAt, items.last().id).encode() else null
-        val quantities = stocks.readStocks(items.map { it.id })
-        return DropPage(items.map { DropWithStock(it, quantities.getValue(it.id)) }, nextCursor)
+        val stocksById = stocks.readStocks(items.map { it.id })
+        return DropPage(items.map { DropWithStock(it, stocksById.getValue(it.id)) }, nextCursor)
     }
 }
