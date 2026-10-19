@@ -24,14 +24,14 @@ class RefreshTokenRepository(private val redis: StringRedisTemplate) {
     }
 
     fun store(userId: UUID, tokenId: UUID, ttl: Duration) {
-        execute(userId) { redis.execute(storeScript, listOf(refreshKey(userId, tokenId), indexKey(userId)), tokenId.toString(), ttl.toMillis().toString()) }
+        translateUnavailable(userId) { redis.execute(storeScript, listOf(refreshKey(userId, tokenId), indexKey(userId)), tokenId.toString(), ttl.toMillis().toString()) }
     }
 
-    fun rotate(userId: UUID, oldTokenId: UUID, newTokenId: UUID, ttl: Duration): Boolean = execute(userId) {
+    fun rotate(userId: UUID, oldTokenId: UUID, newTokenId: UUID, ttl: Duration): Boolean = translateUnavailable(userId) {
         redis.execute(rotateScript, listOf(refreshKey(userId, oldTokenId), refreshKey(userId, newTokenId), indexKey(userId)), oldTokenId.toString(), newTokenId.toString(), ttl.toMillis().toString()) == SCRIPT_SUCCEEDED
     }
 
-    private fun <T> execute(userId: UUID, command: () -> T): T = try {
+    private fun <T> translateUnavailable(userId: UUID, command: () -> T): T = try {
         command()
     } catch (cause: DataAccessException) {
         throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "사용자 $userId 의 인증 토큰 Redis 명령에 실패했습니다", cause = cause)
