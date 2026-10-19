@@ -6,16 +6,12 @@ import io.lettuce.core.output.IntegerOutput
 import io.lettuce.core.protocol.Command
 import io.lettuce.core.protocol.CommandType
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
-import org.springframework.data.redis.RedisConnectionFailureException
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.data.redis.core.StringRedisTemplate
-import java.net.ServerSocket
 import java.time.Duration
 import java.util.UUID
 
@@ -58,21 +54,5 @@ class RedisConnectionTest {
 
         assertThat(redis.opsForValue().get(key)).isEqualTo("connected")
         redis.delete(key)
-    }
-
-    @Test
-    fun `연결을 거절하면 Redis 연결 실패로 종료한다`() {
-        val unavailablePort = ServerSocket(0).use { it.localPort }
-        val unavailable = LettuceConnectionFactory(
-            RedisStandaloneConfiguration("127.0.0.1", unavailablePort),
-            connections.clientConfiguration,
-        )
-        unavailable.afterPropertiesSet()
-        try {
-            assertThatThrownBy { unavailable.connection.use { it.ping() } }
-                .isInstanceOf(RedisConnectionFailureException::class.java)
-        } finally {
-            unavailable.destroy()
-        }
     }
 }

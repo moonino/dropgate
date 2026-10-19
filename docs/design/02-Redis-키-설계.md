@@ -2,7 +2,7 @@
 
 Redis 하나(논리 DB 0)를 세 서비스가 쓴다. 키 앞머리로 소유 서비스를 구분한다. 다른 서비스의 키를 읽거나 쓰지 않는다. 예외는 무효화 목록(auth가 쓰고 전 서비스가 읽는다)과 Streams(order가 쓰고 notification이 읽는다).
 
-Sentinel 마스터 이름 `dropgate-master`. 클라이언트는 Lettuce Sentinel 모드. 명령 타임아웃 200ms, 연결 타임아웃 1초. 쓰기는 마스터로만, 읽기도 마스터로(정합성 우선, 복제 지연 회피).
+2주 차는 단일 Redis에 host와 port로 연결해 Lua와 장애 정책을 검증한다. 3주 차에 Sentinel 로컬 구성을 도입하고 클라이언트를 Sentinel 모드로 전환한다(docs/plan.md). Sentinel 마스터 이름은 `dropgate-master`다. 명령 타임아웃 200ms, 연결 타임아웃 1초. 쓰기는 마스터로만, 읽기도 마스터로(정합성 우선, 복제 지연 회피).
 
 auth와 order의 공통 클라이언트 경계: Boot의 `LettuceClientOptionsBuilderCustomizer` 빈에서 Lettuce의 autoReconnect를 유지하고 replayFilter는 모든 명령에 true를 반환하며 disconnectedBehavior는 REJECT_COMMANDS로 둔다. 기존 소켓 연결 1초와 TimeoutOptions 설정을 보존한다. 앱에서도 Lua를 재시도하지 않는다. 통신 실패는 실행 여부가 불확실하므로 기존 판매 차단, 대조와 수동 복구 원칙을 따른다. 초기화나 INCR 보상을 재전송해 1회 권한과 수량을 깨뜨리지 않기 위한 설정이다. 근거는 [명령 실행 신뢰성](https://redis.github.io/lettuce/advanced-usage/command-execution-reliability/)과 [ClientOptions](https://redis.github.io/lettuce/advanced-usage/client-options/)다. 프로젝트 BOM이 해석한 Lettuce 7.5.2.RELEASE의 [DefaultEndpoint](https://raw.githubusercontent.com/redis/lettuce/7.5.2.RELEASE/src/main/java/io/lettuce/core/protocol/DefaultEndpoint.java)에서 연결 단절 시 pending과 endpoint 큐를 예외로 종료하는 경계를 확인했다. 후속 구현의 실제 단절 테스트로 고정한다.
 
