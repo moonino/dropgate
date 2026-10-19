@@ -32,7 +32,7 @@ describe("구매 복귀 표시 소비", () => {
     expect(window.location.search).toBe("?refreshed=1&tab=info");
   });
 
-  it("상세 조회가503이면 재발급 표시를 유지한다", async () => {
+  it("상세 조회가 503이면 재발급 표시를 유지한다", async () => {
     vi.mocked(callBackendOrUnavailable).mockResolvedValue({ kind: "unavailable", notice: "장애" });
     await renderPage();
     expect(window.location.search).toBe("?refreshed=1&tab=info");

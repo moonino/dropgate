@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Order } from "@/api/types";
 import { createOrder } from "@/test/fixtures";
 import { OrderList } from "./OrderList";
 import { navigateToSessionRecovery } from "./session-navigation";
 
 vi.mock("./session-navigation", () => ({ navigateToSessionRecovery: vi.fn() }));
+beforeEach(() => vi.mocked(navigateToSessionRecovery).mockClear());
 
 function createCanceled(order: Order) {
   return { kind: "canceled", order: { ...order, status: "CANCELED", canceledAt: "2026-10-17T10:40:00.000Z" } } as const;
@@ -23,13 +24,11 @@ const DROP_CLOSED_REJECTION = { kind: "rejected", code: "DROP_CLOSED", message: 
 
 describe("OrderList", () => {
   it("취소 중 재발급이 필요하면 현재 화면 기준으로 이동한다", async () => {
-    vi.mocked(navigateToSessionRecovery).mockClear();
     await cancelWith(createOrder(), { kind: "refresh-required" });
     expect(navigateToSessionRecovery).toHaveBeenCalledOnce();
   });
 
   it("더 보기 중 재발급이 필요하면 현재 화면 기준으로 이동한다", async () => {
-    vi.mocked(navigateToSessionRecovery).mockClear();
     render(<OrderList firstPage={{ items: [createOrder()], nextCursor: "cursor-1" }} cancel={vi.fn()} loadPage={vi.fn().mockResolvedValue({ kind: "refresh-required" })} />);
     await userEvent.click(screen.getByRole("button", { name: "더 보기" }));
     expect(navigateToSessionRecovery).toHaveBeenCalledOnce();
