@@ -12,6 +12,13 @@ private const val LISTED_DROP_CONDITION = "status IN ('SCHEDULED', 'OPEN', 'SOLD
 private const val DROP_STATUS = "dropgate.order.entity.DropStatus"
 
 interface DropRepository : JpaRepository<DropEntity, UUID> {
+    @Query("SELECT d FROM DropEntity d WHERE d.status = $DROP_STATUS.OPEN AND d.stockInitializationClaimed = false ORDER BY d.id")
+    fun findOpenDropsAwaitingStockInitialization(): List<DropEntity>
+
+    @Modifying
+    @Query("UPDATE DropEntity d SET d.stockInitializationClaimed = true WHERE d.id = :id AND d.status = $DROP_STATUS.OPEN AND d.stockInitializationClaimed = false")
+    fun claimStockInitialization(@Param("id") id: UUID): Int
+
     @Query(
         value = """
         SELECT * FROM orders.drops
