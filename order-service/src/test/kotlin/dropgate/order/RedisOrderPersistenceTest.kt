@@ -76,7 +76,7 @@ class RedisOrderPersistenceTest : OrderApiIntegrationTest() {
     fun `취소의 outbox 기록이 실패하면 주문 상태와 원장도 롤백한다`() {
         val userId = UUID.randomUUID()
         val orderId = confirmations.confirm(insertDropWithStock(), userId).order.id
-        jdbc.withRejectedWrites("outbox") {
+        jdbc.withRejectedInserts("outbox") {
             assertThatThrownBy { cancellations.cancel(orderId, userId) }.isInstanceOf(DataAccessException::class.java)
         }
 

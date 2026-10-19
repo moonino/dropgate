@@ -24,7 +24,7 @@ class OrderConfirmationFailureTest : OrderApiIntegrationTest() {
     @ValueSource(strings = ["orders", "order_ledger", "outbox"])
     fun `확정 본문의 기록 실패는 롤백 완료 전용 예외다`(table: String) {
         val dropId = insertDropWithStock()
-        jdbc.withRejectedWrites(table) {
+        jdbc.withRejectedInserts(table) {
             assertThatThrownBy { confirmations.confirm(dropId, UUID.randomUUID()) }
                 .isInstanceOfSatisfying(OrderConfirmationRolledBackException::class.java) { assertThat(it.errorCode).isEqualTo(ErrorCode.ORDER_PERSIST_FAILED) }
         }
@@ -34,7 +34,7 @@ class OrderConfirmationFailureTest : OrderApiIntegrationTest() {
     @Test
     fun `기존 트랜잭션 안에서도 롤백을 마친 뒤 실패가 전파된다`() {
         val dropId = insertDropWithStock()
-        jdbc.withRejectedWrites("outbox") {
+        jdbc.withRejectedInserts("outbox") {
             transactions.executeWithoutResult {
                 assertThatThrownBy { confirmations.confirm(dropId, UUID.randomUUID()) }.isInstanceOf(OrderConfirmationRolledBackException::class.java)
                 assertThat(countRows("orders")).isZero()

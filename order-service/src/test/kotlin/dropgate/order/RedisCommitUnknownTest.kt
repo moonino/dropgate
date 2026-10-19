@@ -37,7 +37,7 @@ class RedisCommitUnknownTest : RedisFlowIntegrationTest() {
         val dropId = initializeStock()
         val userId = UUID.randomUUID()
         val wrapped = OrderConfirmationRolledBackException(ErrorCode.ALREADY_PURCHASED, dropId, userId, IllegalStateException("롤백 대상"))
-        jdbc.withRejectedWrites("orders") {
+        jdbc.withRejectedInserts("orders") {
             failNextRollback(manager, wrapped).use {
                 expectPersistenceFailure { flow.purchase(dropId, userId) }
             }

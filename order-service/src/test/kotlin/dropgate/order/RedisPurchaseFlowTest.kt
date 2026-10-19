@@ -21,7 +21,7 @@ class RedisPurchaseFlowTest : RedisFlowIntegrationTest() {
     @Test
     fun `DB 저장 실패는 Redis 예약을 보상하고 원래 수량을 다시 판매한다`() {
         val dropId = initializeStock()
-        jdbc.withRejectedWrites("orders") {
+        jdbc.withRejectedInserts("orders") {
             expectCode(ErrorCode.ORDER_PERSIST_FAILED) { flow.purchase(dropId, UUID.randomUUID()) }
         }
 
