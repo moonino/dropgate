@@ -37,9 +37,9 @@ function createValidForm(): FormData {
 }
 
 describe("createDropAction", () => {
-  it("액세스 쿠키가 없으면 재발급 결과를 돌려준다", async () => {
+  it("액세스 쿠키가 없으면 입력 검증보다 재발급을 우선한다", async () => {
     cookieStore.get.mockReturnValue(undefined);
-    expect(await createDropAction({ kind: "idle" }, createValidForm())).toEqual({ kind: "refresh-required" });
+    expect(await createDropAction({ kind: "idle" }, new FormData())).toEqual({ kind: "refresh-required" });
   });
 
   it("백엔드가 401이면 재발급 결과를 돌려준다", async () => {
