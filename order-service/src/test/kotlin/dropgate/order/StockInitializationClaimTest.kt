@@ -37,7 +37,6 @@ class StockInitializationClaimTest : DropApiIntegrationTest() {
 
         tick()
 
-        assertThat(findDropStatus(dropId)).isEqualTo("OPEN")
         assertThat(isClaimed(dropId)).isTrue()
         assertThat(redis.opsForValue().get("drop:$dropId:stock")).isEqualTo("10")
         assertThat(redis.opsForHash<String, String>().get("drop:$dropId:meta", "status")).isEqualTo("OPEN")
@@ -78,8 +77,35 @@ class StockInitializationClaimTest : DropApiIntegrationTest() {
     }
 
     @Test
-    fun `최초 Redis 실패는 DB 전이와 다른 드롭을 막지 않고 권한을 재시도하지 않는다`() {
+    fun `Redis 초기화가 실패해도 DB의 OPEN 전이는 유지된다`() {
+        val dropId = insertDrop()
+
+        tickUnavailable()
+
+        assertThat(findDropStatus(dropId)).isEqualTo("OPEN")
+    }
+
+    @Test
+    fun `Redis 실패 뒤에도 대상 드롭들의 초기화 권한은 커밋되어 있다`() {
         val dropIds = listOf(insertDrop(), insertDrop())
+
+        tickUnavailable()
+
+        assertThat(dropIds.map(::isClaimed)).containsOnly(true)
+    }
+
+    @Test
+    fun `최초 Redis 실패 뒤 정상 틱도 초기화 권한을 재사용하지 않는다`() {
+        val dropId = insertDrop()
+        tickUnavailable()
+
+        tick()
+
+        assertThat(redis.hasKey("drop:$dropId:stock")).isFalse()
+        assertThat(redis.hasKey("drop:$dropId:meta")).isFalse()
+    }
+
+    private fun tickUnavailable() {
         val port = ServerSocket(0).use { it.localPort }
         val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connections.clientConfiguration)
         unavailable.afterPropertiesSet()
@@ -87,15 +113,6 @@ class StockInitializationClaimTest : DropApiIntegrationTest() {
             tick(DropStockRepository(StringRedisTemplate(unavailable)))
         } finally {
             unavailable.destroy()
-        }
-
-        tick()
-
-        dropIds.forEach { dropId ->
-            assertThat(findDropStatus(dropId)).isEqualTo("OPEN")
-            assertThat(isClaimed(dropId)).isTrue()
-            assertThat(redis.hasKey("drop:$dropId:stock")).isFalse()
-            assertThat(redis.hasKey("drop:$dropId:meta")).isFalse()
         }
     }
 

@@ -21,6 +21,10 @@ class DropStatusTransitionScheduler(
     @Scheduled(fixedDelay = TRANSITION_INTERVAL_SECONDS, timeUnit = TimeUnit.SECONDS)
     fun transitionDueDrops() {
         transitions.transitionDueDrops(clock.instant())
+        initializeClaimedStocks()
+    }
+
+    private fun initializeClaimedStocks() {
         initializations.claimOpenDrops().forEach { drop ->
             try {
                 stocks.initialize(drop)
