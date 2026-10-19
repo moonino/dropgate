@@ -21,13 +21,8 @@ class RedisPurchaseFlowTest : RedisFlowIntegrationTest() {
     @Test
     fun `DB 저장 실패는 Redis 예약을 보상하고 원래 수량을 다시 판매한다`() {
         val dropId = initializeStock()
-        jdbc.sql("CREATE FUNCTION orders.reject_order() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''test failure''; END'").update()
-        jdbc.sql("CREATE TRIGGER reject_order BEFORE INSERT ON orders.orders FOR EACH ROW EXECUTE FUNCTION orders.reject_order()").update()
-        try {
+        jdbc.withRejectedWrites("orders") {
             expectCode(ErrorCode.ORDER_PERSIST_FAILED) { flow.purchase(dropId, UUID.randomUUID()) }
-        } finally {
-            jdbc.sql("DROP TRIGGER reject_order ON orders.orders").update()
-            jdbc.sql("DROP FUNCTION orders.reject_order()").update()
         }
 
         flow.purchase(dropId, UUID.randomUUID())
