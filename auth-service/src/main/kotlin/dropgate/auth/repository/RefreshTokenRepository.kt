@@ -1,5 +1,6 @@
 package dropgate.auth.repository
 
+import dropgate.common.authentication.createRevokedAccessTokenKey
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
 import org.springframework.core.io.ClassPathResource
@@ -36,7 +37,7 @@ class RefreshTokenRepository(private val redis: StringRedisTemplate) {
     }
 
     fun logout(userId: UUID, tokenId: String, ttl: Duration) {
-        translateUnavailable(userId) { redis.execute(logoutScript, listOf("auth:revoked:$tokenId", indexKey(userId)), ttl.toMillis().toString(), refreshPrefix(userId)) }
+        translateUnavailable(userId) { redis.execute(logoutScript, listOf(createRevokedAccessTokenKey(tokenId), indexKey(userId)), ttl.toMillis().toString(), refreshPrefix(userId)) }
     }
 
     private fun <T> translateUnavailable(userId: UUID, command: () -> T): T = try {
