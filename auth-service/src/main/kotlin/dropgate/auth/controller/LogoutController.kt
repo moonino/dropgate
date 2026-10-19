@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-class LogoutController(private val decoder: AccessTokenDecoder, private val tokens: TokenLogoutService) {
+class LogoutController(private val decoder: AccessTokenDecoder, private val logouts: TokenLogoutService) {
     @PostMapping("/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun logout(@RequestHeader(value = HttpHeaders.AUTHORIZATION, defaultValue = "") authorization: String) = tokens.logout(decoder.decode(authorization))
+    fun logout(@RequestHeader(value = HttpHeaders.AUTHORIZATION, defaultValue = "") authorization: String) = logouts.logout(decoder.decode(authorization))
 }

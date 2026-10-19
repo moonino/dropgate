@@ -147,7 +147,7 @@ export interface paths {
         put?: never;
         /**
          * 액세스 토큰 무효화와 리프레시 전부 폐기
-         * @description 성공하면 204이며 해당 사용자의 모든 리프레시를 폐기해 이후 재발급은 401이다. Redis 실패는 503 AUTH_UNAVAILABLE과 Retry-After 2다.
+         * @description 성공하면 204이며 해당 사용자의 모든 리프레시를 폐기해 이후 재발급은 401이다. 같은 액세스로 다시 로그아웃하거나 내 정보를 조회하면 401이다. Redis 실패는 503 AUTH_UNAVAILABLE과 Retry-After 2다.
          */
         post: {
             parameters: {
@@ -184,7 +184,7 @@ export interface paths {
         };
         /**
          * 내 정보
-         * @description 액세스 토큰의 사용자 정보를 조회한다. 토큰 누락, 서명 불일치, 만료, 다른 발급자, 리프레시 토큰, 사용자 없음은 401 UNAUTHENTICATED다.
+         * @description 액세스 토큰의 사용자 정보를 조회한다. 토큰 누락, 서명 불일치, 만료, 다른 발급자, 리프레시 토큰, 무효화된 토큰, 사용자 없음은 401 UNAUTHENTICATED다. 요청마다 무효화를 확인하고 확인 실패는 503 AUTH_UNAVAILABLE과 Retry-After 2다.
          */
         get: {
             parameters: {
