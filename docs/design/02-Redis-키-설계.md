@@ -39,7 +39,7 @@ auth와 order의 공통 클라이언트 경계: Boot의 `LettuceClientOptionsBui
 
 init.lua의 KEYS는 stock, meta이고 ARGV는 total_quantity, open_at ms, close_at ms, rate다. meta가 있으면 아무것도 하지 않고 0을 돌려준다. 없으면 meta를 HSET(status OPEN, open_at, close_at, rate), stock을 SET NX total_quantity 하고 두 키를 PEXPIREAT close_at + 7일로 맞춘 뒤 1을 돌려준다.
 
-최초 초기화 실패도 실행 여부를 확신할 수 없으므로 claim을 유지하고 경고 로그를 남긴다. 다음 틱에 자동 재시도하지 않는다. 키가 없으면 판매를 차단해 수동 복구하고, 응답만 유실돼 이미 성공한 키가 있으면 기존 구매 계약대로 사용한다. claim=true 드롭의 Redis 키가 유실돼도 자동 재생성하지 않는다. 초기화 전이나 meta 유실 뒤 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 같은 초기화 절차를 쓴다(ADR 0005).
+최초 초기화 실패도 실행 여부를 확신할 수 없으므로 claim을 유지하고 경고 로그를 남긴다. 다음 틱에 자동 재시도하지 않는다. 키가 없으면 판매를 차단해 수동 복구하고, 응답만 유실돼 이미 성공한 키가 있으면 기존 구매 계약대로 사용한다. claim=true 드롭의 Redis 키가 유실돼도 자동 재생성하지 않는다. 초기화 전이나 meta 유실 뒤 Redis 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 같은 초기화 절차를 쓴다(ADR 0005).
 
 수동 복구는 모든 주문 인스턴스를 중지하고 진행 중 DB 트랜잭션 종료와 기존 Redis 클라이언트 연결 및 미처리 쓰기 제거를 확인한 뒤 한다. CONFIRMED 주문 수로 stock을 total_quantity에서 그 수를 뺀 값으로, buyers를 해당 사용자 집합으로 복원하고 meta의 상태와 시각, rate 및 각 키의 TTL을 맞춘 뒤 재개한다. claim은 true로 유지한다. DB 건수만 보고 자동 초기화를 허용하지 않는다. 진행 중 주문이 아직 집계되지 않을 수 있어 가용성보다 초과 판매 방지를 택한다.
 
