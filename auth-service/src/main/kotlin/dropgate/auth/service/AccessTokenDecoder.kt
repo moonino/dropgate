@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 private val BEARER_HEADER = Regex("Bearer +([^\\s]+)", RegexOption.IGNORE_CASE)
@@ -30,7 +31,7 @@ class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
         )
     }
 
-    fun decodeUserId(authorization: String): UUID {
+    fun decode(authorization: String): VerifiedAccessToken {
         val token = BEARER_HEADER.matchEntire(authorization)?.groupValues?.get(1)
             ?: throw DropgateException(ErrorCode.UNAUTHENTICATED, "Bearer 인증 헤더가 없거나 형식이 올바르지 않습니다")
         return try {
@@ -41,7 +42,9 @@ class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
             val subject = requireNotNull(jwt.subject) { "토큰에 사용자 식별자 sub가 없습니다" }
             val userId = UUID.fromString(subject)
             require(userId.toString().equals(subject, ignoreCase = true)) { "sub가 표준 UUID 형식이 아닙니다" }
-            userId
+            val tokenId = requireNotNull(jwt.id) { "토큰에 식별자 jti가 없습니다" }
+            require(tokenId.isNotBlank()) { "토큰의 식별자 jti가 비어 있습니다" }
+            VerifiedAccessToken(userId, tokenId, expiresAt)
         } catch (exception: JwtException) {
             throw DropgateException(ErrorCode.UNAUTHENTICATED, "액세스 토큰 검증 실패: ${exception.message}", cause = exception)
         } catch (exception: IllegalArgumentException) {
@@ -49,3 +52,5 @@ class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
         }
     }
 }
+
+data class VerifiedAccessToken(val userId: UUID, val tokenId: String, val expiresAt: Instant)

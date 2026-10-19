@@ -22,6 +22,10 @@ class RefreshTokenRepository(private val redis: StringRedisTemplate) {
         setLocation(ClassPathResource("redis/rotate-refresh.lua"))
         resultType = Long::class.javaObjectType
     }
+    private val logoutScript = DefaultRedisScript<Long>().apply {
+        setLocation(ClassPathResource("redis/logout.lua"))
+        resultType = Long::class.javaObjectType
+    }
 
     fun store(userId: UUID, tokenId: UUID, ttl: Duration) {
         translateUnavailable(userId) { redis.execute(storeScript, listOf(refreshKey(userId, tokenId), indexKey(userId)), tokenId.toString(), ttl.toMillis().toString()) }
@@ -31,13 +35,19 @@ class RefreshTokenRepository(private val redis: StringRedisTemplate) {
         redis.execute(rotateScript, listOf(refreshKey(userId, oldTokenId), refreshKey(userId, newTokenId), indexKey(userId)), oldTokenId.toString(), newTokenId.toString(), ttl.toMillis().toString()) == SCRIPT_SUCCEEDED
     }
 
+    fun logout(userId: UUID, tokenId: String, ttl: Duration) {
+        translateUnavailable(userId) { redis.execute(logoutScript, listOf("auth:revoked:$tokenId", indexKey(userId)), ttl.toMillis().toString(), refreshPrefix(userId)) }
+    }
+
     private fun <T> translateUnavailable(userId: UUID, command: () -> T): T = try {
         command()
     } catch (cause: DataAccessException) {
         throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "사용자 $userId 의 인증 토큰 Redis 명령에 실패했습니다", cause = cause)
     }
 
-    private fun refreshKey(userId: UUID, tokenId: UUID): String = "auth:refresh:$userId:$tokenId"
+    private fun refreshKey(userId: UUID, tokenId: UUID): String = refreshPrefix(userId) + tokenId
+
+    private fun refreshPrefix(userId: UUID): String = "auth:refresh:$userId:"
 
     private fun indexKey(userId: UUID): String = "auth:refresh-index:$userId"
 }
