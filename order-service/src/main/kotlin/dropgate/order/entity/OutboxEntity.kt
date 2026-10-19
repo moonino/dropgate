@@ -2,12 +2,15 @@ package dropgate.order.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
+import java.time.Instant
 import java.util.UUID
 
 @Entity
@@ -21,4 +24,22 @@ class OutboxEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    var status: OutboxStatus = OutboxStatus.PENDING
+        protected set
+
+    @Column(nullable = false)
+    var attempts: Int = 0
+        protected set
+
+    @Column(name = "published_at")
+    var publishedAt: Instant? = null
+        protected set
+
+    fun markPublished(at: Instant) {
+        status = OutboxStatus.PUBLISHED
+        publishedAt = at
+    }
 }
