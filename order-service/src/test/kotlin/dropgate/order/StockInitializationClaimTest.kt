@@ -1,5 +1,6 @@
 package dropgate.order
 
+import dropgate.order.configuration.OrderProperties
 import dropgate.order.repository.DropStockRepository
 import dropgate.order.service.DropStatusTransitionScheduler
 import dropgate.order.service.DropStatusTransitionService
@@ -110,7 +111,7 @@ class StockInitializationClaimTest : DropApiIntegrationTest() {
         val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connections.clientConfiguration)
         unavailable.afterPropertiesSet()
         try {
-            tick(DropStockRepository(StringRedisTemplate(unavailable)))
+            tick(DropStockRepository(StringRedisTemplate(unavailable), OrderProperties()))
         } finally {
             unavailable.destroy()
         }
