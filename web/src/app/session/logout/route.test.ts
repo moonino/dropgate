@@ -6,6 +6,11 @@ import { POST } from "./route";
 
 const AUTH = "http://auth.test";
 const WEB = "http://web.test";
+const LOGOUT_RESPONSES = [
+  { name: "본문 없는 204", reply: () => new HttpResponse(null, { status: 204 }) },
+  { name: "503", reply: () => HttpResponse.json({ code: "AUTH_UNAVAILABLE", message: "x" }, { status: 503 }) },
+  { name: "연결 실패", reply: () => HttpResponse.error() },
+];
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
@@ -27,19 +32,26 @@ describe("POST /session/logout", () => {
     expect(received).toHaveBeenCalledWith("Bearer access-token");
   });
 
-  it.each([
-    { name: "본문 없는 204", reply: () => new HttpResponse(null, { status: 204 }) },
-    { name: "503", reply: () => HttpResponse.json({ code: "AUTH_UNAVAILABLE", message: "x" }, { status: 503 }) },
-    { name: "연결 실패", reply: () => HttpResponse.error() },
-  ])("$name여도 두 쿠키를 지우고 드롭 목록으로 303 이동한다", async ({ reply }) => {
+  it.each(LOGOUT_RESPONSES)("$name여도 두 쿠키를 지운다", async ({ reply }) => {
     server.use(http.post(`${AUTH}/auth/logout`, reply));
     const response = await POST(createLogoutRequest());
-    expect(response.status).toBe(303);
-    expect(response.headers.get("Location")).toBe(`${WEB}/drops`);
     expect(response.headers.getSetCookie()).toEqual([
       expect.stringMatching(/dropgate_access=; Path=\/;.*Max-Age=0/),
       expect.stringMatching(/dropgate_refresh=; Path=\/session;.*Max-Age=0/),
     ]);
+  });
+
+  it.each(LOGOUT_RESPONSES)("$name여도 드롭 목록으로 303 이동한다", async ({ reply }) => {
+    server.use(http.post(`${AUTH}/auth/logout`, reply));
+    const response = await POST(createLogoutRequest());
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe(`${WEB}/drops`);
+  });
+
+  it("본문 없는 204 성공은 실패로 기록하지 않는다", async () => {
+    server.use(http.post(`${AUTH}/auth/logout`, () => new HttpResponse(null, { status: 204 })));
+    await POST(createLogoutRequest());
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it("액세스 쿠키가 없으면 백엔드를 호출하지 않는다", async () => {
