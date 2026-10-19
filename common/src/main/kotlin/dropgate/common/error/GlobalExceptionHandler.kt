@@ -47,8 +47,8 @@ class GlobalExceptionHandler {
         .ifEmpty { BODY_FIELD }
 
     private fun ParameterValidationResult.toFieldErrorResponses(): List<FieldErrorResponse> {
-        val parameterName = methodParameter.readRequestName()
-        return resolvableErrors.map { FieldErrorResponse(it.readFieldOr(parameterName), it.defaultMessage.orEmpty()) }
+        val requestName = methodParameter.readRequestName()
+        return resolvableErrors.map { FieldErrorResponse(it.readFieldOr(requestName), it.defaultMessage.orEmpty()) }
     }
 
     private fun MethodParameter.readRequestName(): String {
