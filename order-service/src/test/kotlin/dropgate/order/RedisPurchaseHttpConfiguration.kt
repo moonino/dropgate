@@ -17,7 +17,7 @@ import java.time.Clock
 class RedisPurchaseHttpConfiguration {
     @Bean
     @Primary
-    fun purchaseFailureFlow(
+    fun redisPurchaseFlow(
         stocks: DropStockRepository,
         confirmations: RedisOrderConfirmationService,
         cancellations: RedisOrderCancelService,
