@@ -3,6 +3,7 @@ package dropgate.order.service
 import dropgate.order.entity.OutboxEntity
 import dropgate.order.entity.OutboxStatus
 import dropgate.order.event.OrderEventStream
+import dropgate.order.event.OrderEventStreamUnavailableException
 import dropgate.order.repository.OutboxRepository
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
@@ -23,6 +24,9 @@ class OutboxRelayService(private val outbox: OutboxRepository, private val event
         for (event in outbox.findPendingForUpdate(OUTBOX_BATCH_SIZE)) {
             try {
                 events.publish(event)
+            } catch (exception: OrderEventStreamUnavailableException) {
+                log.warn("Redis 장애로 outbox {} 이후 발행을 다음 실행으로 미룹니다", event.id, exception)
+                return
             } catch (exception: RuntimeException) {
                 recordFailure(event, exception)
                 continue
