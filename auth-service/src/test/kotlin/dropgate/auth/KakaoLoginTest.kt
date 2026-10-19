@@ -56,6 +56,7 @@ import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Date
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -167,6 +168,29 @@ class KakaoLoginTest @Autowired constructor(
     }
 
     @Test
+    fun `리프레시는 만료 직전까지 주입한 Clock으로 검증한다`() {
+        val token = requestTokenPair()["refreshToken"] as String
+        val claims = SignedJWT.parse(token).jwtClaimsSet
+        assertThat(refreshDecoderAt(claims.expirationTime.toInstant().minusNanos(1)).decode(token).userId).isEqualTo(UUID.fromString(claims.subject))
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = [0, 1])
+    fun `리프레시는 정확한 만료 시각부터 거부한다`(secondsAfterExpiry: Long) {
+        val token = requestTokenPair()["refreshToken"] as String
+        val expiry = SignedJWT.parse(token).jwtClaimsSet.expirationTime.toInstant()
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { refreshDecoderAt(expiry.plusSeconds(secondsAfterExpiry)).decode(token) }.hasMessageContaining("exp")
+    }
+
+    @Test
+    fun `리프레시는 nbf 직전에는 거부하고 해당 시각부터 허용한다`() {
+        val notBefore = Instant.ofEpochSecond(Instant.now().epochSecond + 60)
+        val token = signRefreshToken { notBeforeTime(Date.from(notBefore)) }
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { refreshDecoderAt(notBefore.minusNanos(1)).decode(token) }
+        assertThat(refreshDecoderAt(notBefore).decode(token).userId).isEqualTo(UUID.fromString(SignedJWT.parse(token).jwtClaimsSet.subject))
+    }
+
+    @Test
     fun `다른 키로 서명한 리프레시를 거부한다`() {
         expectUnauthenticatedResponse(refresh(signRefreshToken(key = JwtConfiguration().jwtSigningKey(generatePrivateKeyPem()))))
     }
@@ -208,6 +232,8 @@ class KakaoLoginTest @Autowired constructor(
         val original = SignedJWT.parse(requestTokenPair()["refreshToken"] as String)
         return SignedJWT(original.header, JWTClaimsSet.Builder(original.jwtClaimsSet).apply(change).build()).apply { sign(RSASSASigner(key)) }.serialize()
     }
+
+    private fun refreshDecoderAt(instant: Instant): RefreshTokenDecoder = RefreshTokenDecoder(JwtConfiguration().jwtSigningKey(privateKeyPem), Clock.fixed(instant, ZoneOffset.UTC))
 
     @Test
     fun `로그인은 state 쿠키와 카카오 인가 URL을 302로 돌려준다`() {
