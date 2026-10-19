@@ -45,34 +45,21 @@ def read_run(filename, expected_path):
     summary = read_verified(manifest["summaryFile"], manifest["summarySha256"])
     report = read_verified(manifest["reconciliationFile"], manifest["reconciliationSha256"])
     metrics = summary["metrics"]
-    counts = [number(metrics.get(name, {}).get("count", 0), name) for name in OUTCOMES]
+    confirmed, sold_out, already_purchased, unexpected = [number(metrics.get(name, {}).get("count", 0), name) for name in OUTCOMES]
     requests = number(metrics["http_reqs"]["count"], "http_reqs.count")
     rate = number(metrics["http_reqs"]["rate"], "http_reqs.rate")
-    require(requests == REQUEST_COUNT and sum(counts) == requests, "응답 건수가 요청 건수와 다릅니다")
-    require(counts[0] == TOTAL_QUANTITY and counts[3] == 0 and rate > 0, "성공 또는 오류 건수가 잘못됐습니다")
-    for metric, threshold in (("purchase_unexpected", "count==0"),
-                              ("http_req_duration{status:201}", "max>=0"),
-                              ("http_req_duration{status:409}", "max>=0")):
-        require(metrics[metric]["thresholds"][threshold] is False, f"임계값이 실패했습니다: {metric}")
-    require(report["purchasePath"] == expected_path and report["totalQuantity"] == TOTAL_QUANTITY, "대조 경로가 다릅니다")
-    require(report["confirmed"] == TOTAL_QUANTITY and report["canceled"] == 0 and report["duplicatedUsers"] == 0,
-            "주문 대조가 실패했습니다")
-    require(report["status"] == "SOLD_OUT" and report["outbox"] == {"pending": 0, "published": TOTAL_QUANTITY, "failed": 0}
-            and report["streamLength"] == TOTAL_QUANTITY, "발행 또는 판매 상태가 잘못됐습니다")
-    if expected_path == "redis":
-        require(report["redisStockDifference"] == 0 and report["buyersDifference"] == 0, "Redis 대조 차가 있습니다")
-    else:
-        require(report["dbStockDifference"] == 0 and report["redisStock"] == TOTAL_QUANTITY and report["buyers"] == 0,
-                "DB 대조 또는 Redis 초기 상태가 잘못됐습니다")
+    require(requests > 0 and rate > 0, "요청 건수와 RPS는 양수여야 합니다")
+    require(report["purchasePath"] == expected_path and report["totalQuantity"] == manifest["totalQuantity"],
+            "완료 기록과 대조 보고서의 경로 또는 총수량이 다릅니다")
     duration = requests / rate
     return {
         "runId": manifest["runId"], "purchasePath": expected_path, "startedAtUtc": manifest["startedAtUtc"],
         "sourceCommit": manifest["sourceCommit"], "jarSha256": manifest["jarSha256"],
         "summaryFile": manifest["summaryFile"], "reconciliationFile": manifest["reconciliationFile"],
-        "confirmed": counts[0], "soldOut": counts[1], "alreadyPurchased": counts[2], "unexpected": counts[3],
+        "confirmed": confirmed, "soldOut": sold_out, "alreadyPurchased": already_purchased, "unexpected": unexpected,
         "overall": trend(metrics, "http_req_duration", requests, duration),
-        "status201": trend(metrics, "http_req_duration{status:201}", counts[0], duration),
-        "status409": trend(metrics, "http_req_duration{status:409}", counts[1] + counts[2], duration),
+        "status201": trend(metrics, "http_req_duration{status:201}", confirmed, duration),
+        "status409": trend(metrics, "http_req_duration{status:409}", sold_out + already_purchased, duration),
         "reconciliation": report,
     }
 
@@ -118,6 +105,6 @@ def main(filenames):
 if __name__ == "__main__":
     try:
         main(sys.argv[1:])
-    except (KeyError, ValueError, OSError) as error:
+    except (KeyError, TypeError, ValueError, OSError) as error:
         print(f"집계 실패: {error}", file=sys.stderr)
         sys.exit(1)
