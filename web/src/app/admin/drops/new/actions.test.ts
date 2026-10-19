@@ -37,14 +37,12 @@ function createValidForm(): FormData {
 }
 
 describe("createDropAction", () => {
-  it("백엔드가 401이면 두 세션 쿠키를 지운다", async () => {
-    await createDropAction({ kind: "idle" }, createValidForm()).catch(() => undefined);
-
-    expect(cookieStore.set).toHaveBeenCalledWith("dropgate_access", "", expect.objectContaining({ maxAge: 0 }));
-    expect(cookieStore.set).toHaveBeenCalledWith("dropgate_refresh", "", expect.objectContaining({ maxAge: 0 }));
+  it("액세스 쿠키가 없으면 입력 검증보다 재발급을 우선한다", async () => {
+    cookieStore.get.mockReturnValue(undefined);
+    expect(await createDropAction({ kind: "idle" }, new FormData())).toEqual({ kind: "refresh-required" });
   });
 
-  it("백엔드가 401이면 로그인 화면으로 보낸다", async () => {
-    await expect(createDropAction({ kind: "idle" }, createValidForm())).rejects.toThrow("redirect /login");
+  it("백엔드가 401이면 재발급 결과를 돌려준다", async () => {
+    expect(await createDropAction({ kind: "idle" }, createValidForm())).toEqual({ kind: "refresh-required" });
   });
 });

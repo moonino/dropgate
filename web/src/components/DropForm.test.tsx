@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { DropFormState } from "@/app/admin/drops/new/actions";
 import { DropForm } from "./DropForm";
+import { navigateToSessionRecovery } from "./session-navigation";
+
+vi.mock("./session-navigation", () => ({ navigateToSessionRecovery: vi.fn() }));
 
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
 
@@ -20,6 +23,12 @@ async function submitWith(fieldError: typeof CLOSE_AT_ERROR): Promise<void> {
 }
 
 describe("DropForm", () => {
+  it("등록 중 재발급이 필요하면 현재 화면 기준으로 이동한다", async () => {
+    render(<DropForm action={vi.fn().mockResolvedValue({ kind: "refresh-required" })} />);
+    await userEvent.click(screen.getByRole("button", { name: "드롭 등록" }));
+    await waitFor(() => expect(navigateToSessionRecovery).toHaveBeenCalledOnce());
+  });
+
   it("서버의 필드 오류를 해당 입력란 아래 설명으로 붙인다", async () => {
     await submitWith(CLOSE_AT_ERROR);
 

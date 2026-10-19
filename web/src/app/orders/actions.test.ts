@@ -1,7 +1,7 @@
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadOrdersPage } from "./actions";
+import { cancelOrder, loadOrdersPage } from "./actions";
 
 const { cookieStore, redirect } = vi.hoisted(() => ({
   cookieStore: { get: vi.fn(), set: vi.fn() },
@@ -24,17 +24,19 @@ beforeEach(() => {
   cookieStore.get.mockReturnValue({ value: "expired-token" });
   cookieStore.set.mockClear();
   server.use(http.get(`${ORDER}/api/orders/me`, () => HttpResponse.json({ code: "UNAUTHENTICATED", message: "x" }, { status: 401 })));
+  server.use(http.post(`${ORDER}/api/orders/order-1/cancel`, () => HttpResponse.json({ code: "UNAUTHENTICATED", message: "x" }, { status: 401 })));
 });
 
-describe("loadOrdersPage", () => {
-  it("백엔드가 401이면 두 세션 쿠키를 지운다", async () => {
-    await loadOrdersPage("cursor-1").catch(() => undefined);
-
-    expect(cookieStore.set).toHaveBeenCalledWith("dropgate_access", "", expect.objectContaining({ maxAge: 0 }));
-    expect(cookieStore.set).toHaveBeenCalledWith("dropgate_refresh", "", expect.objectContaining({ maxAge: 0 }));
+describe.each([
+  { name: "주문 취소", perform: () => cancelOrder("order-1") },
+  { name: "주문 더 보기", perform: () => loadOrdersPage("cursor-1") },
+])("$name", ({ perform }) => {
+  it("액세스 쿠키가 없으면 재발급 결과를 돌려준다", async () => {
+    cookieStore.get.mockReturnValue(undefined);
+    expect(await perform()).toEqual({ kind: "refresh-required" });
   });
 
-  it("백엔드가 401이면 로그인 화면으로 보낸다", async () => {
-    await expect(loadOrdersPage("cursor-1")).rejects.toThrow("redirect /login");
+  it("백엔드가 401이면 재발급 결과를 돌려준다", async () => {
+    expect(await perform()).toEqual({ kind: "refresh-required" });
   });
 });
