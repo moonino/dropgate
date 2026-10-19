@@ -1,10 +1,12 @@
 package dropgate.order
 
 import dropgate.order.entity.OutboxStatus
+import dropgate.order.event.OrderEventStream
 import dropgate.order.repository.OutboxRepository
 import dropgate.order.service.OutboxRelayService
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,9 +27,19 @@ class OutboxFailurePolicyTest : OrderApiIntegrationTest() {
     @Autowired
     lateinit var redis: StringRedisTemplate
 
+    @Autowired
+    lateinit var events: OrderEventStream
+
     @BeforeEach
     fun clearEventStream() {
         redis.delete("orders.events")
+    }
+
+    @Test
+    fun `누락된 발생 시각 필드를 오류에 남긴다`() {
+        val event = outbox.findById(insertInvalidEvent()).orElseThrow()
+
+        assertThatThrownBy { events.publish(event) }.hasStackTraceContaining("confirmedAt")
     }
 
     @Test

@@ -42,6 +42,6 @@ class OrderEventStream(private val redis: StringRedisTemplate, private val jsonM
             ORDER_CANCELED_EVENT -> "canceledAt"
             else -> throw IllegalArgumentException("발생 시각을 읽을 수 없는 주문 이벤트입니다: ${event.id} ${event.eventType}")
         }
-        return Instant.parse(jsonMapper.readTree(event.payload).path(field).stringValue(""))
+        return Instant.parse(jsonMapper.readTree(event.payload).required(field).stringValue())
     }
 }
