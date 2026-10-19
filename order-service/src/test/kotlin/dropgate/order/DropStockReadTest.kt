@@ -58,7 +58,7 @@ class DropStockReadTest : DropApiIntegrationTest() {
 
     @Test
     fun `빈 목록은 Redis 명령을 보내지 않는다`() {
-        val commands = recordReadCommands { assertThat(stocks.readStocks(emptyList())).isEmpty() }
+        val commands = recordReadCommands { stocks.readStocks(emptyList()) }
 
         assertThat(commands).isEmpty()
     }

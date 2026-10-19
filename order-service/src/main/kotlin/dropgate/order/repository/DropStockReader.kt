@@ -12,12 +12,9 @@ class DropStockReader(private val redis: StringRedisTemplate) {
         parseStock(redis.opsForValue().get(createDropRedisKey(dropId, "stock")))
     }
 
-    fun readStocks(dropIds: List<UUID>): Map<UUID, RemainingStock> {
-        if (dropIds.isEmpty()) return emptyMap()
-        return readOrElse(dropIds, dropIds.associateWith<UUID, RemainingStock> { RemainingStock.Unknown }) {
-            val values = redis.opsForValue().multiGet(dropIds.map { createDropRedisKey(it, "stock") }).orEmpty()
-            dropIds.mapIndexed { index, id -> id to parseStock(values.getOrNull(index)) }.toMap()
-        }
+    fun readStocks(dropIds: List<UUID>): Map<UUID, RemainingStock> = readOrElse(dropIds, dropIds.associateWith<UUID, RemainingStock> { RemainingStock.Unknown }) {
+        val values = redis.opsForValue().multiGet(dropIds.map { createDropRedisKey(it, "stock") }).orEmpty()
+        dropIds.mapIndexed { index, id -> id to parseStock(values.getOrNull(index)) }.toMap()
     }
 
     private fun parseStock(value: String?): RemainingStock = value?.toIntOrNull()?.let { RemainingStock.Known(it) } ?: RemainingStock.Unknown
