@@ -22,7 +22,7 @@ server:
 
 dropgate:
   order:
-    purchase-path: ${DROPGATE_PURCHASE_PATH:db}
+    purchase-path: ${DROPGATE_PURCHASE_PATH:redis}
     queue:
       enabled: ${DROPGATE_QUEUE_ENABLED:false}
   auth:
