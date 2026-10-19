@@ -2,8 +2,8 @@
 
 | 항목 | 내용 |
 |---|---|
-| 날짜, 도구 | 2026-10-19, Codex 코딩 초안. 기존 DB 취소의 기본 @Transactional을 Redis 취소에 사용한 구현이다. root의 코드 교차검토에서 외부 트랜잭션 합류 문제를 발견했으며 자동 리뷰 지적 사례가 아니다. |
-| 제안 요지 | [PR #150](https://github.com/moonino/dropgate/pull/150)의 비활성 RedisOrderCancelService는 REQUIRED로 호출자의 트랜잭션에 합류했다. Flow가 cancel의 정상 반환 직후 Redis 재고를 복구하도록 연결하는 초안이었다. |
+| 날짜, 도구 | 2026-10-19, Codex 코딩 초안 |
+| 제안 요지 | [PR #150](https://github.com/moonino/dropgate/pull/150)의 비활성 RedisOrderCancelService는 REQUIRED로 호출자의 트랜잭션에 합류했다. Flow가 cancel의 정상 반환 직후 Redis 재고를 복구하도록 연결하는 초안이었다. 기존 DB 취소의 기본 @Transactional을 Redis 취소에 사용한 구현이다. root의 코드 교차검토에서 외부 트랜잭션 합류 문제를 발견했으며 자동 리뷰 지적 사례가 아니다. |
 | 왜 틀렸나 | 동시성 가정 오류. 트랜잭션 메서드가 정상 반환해도 외부 트랜잭션에 합류했다면 실제 COMMIT은 끝나지 않았다. Redis를 늘린 뒤 외부 트랜잭션이 롤백하면 DB는 CONFIRMED인데 stock은 1이 되어 같은 재고를 추가 판매할 수 있다. |
 | 어떻게 알았나 | 테스트. 이 사례는 정책 변이가 아니라 실제 REQUIRED 구현에 회귀 테스트를 먼저 추가해 실행했다. JDK 21에서 실행한 명령은 `JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 ./gradlew --max-workers=2 --no-parallel :order-service:test --tests '*RedisCancelTransactionTest'`다. 보관 결과 work/w2/drafts/redis-cancel-transaction-red.xml의 테스트 1개가 실패했으며, 외부 트랜잭션을 rollback-only로 종료한 뒤 기대 (CANCELED, stock 1), 실제 (CONFIRMED, stock 1)이었다. REQUIRES_NEW로 바꾼 뒤 `JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 ./gradlew --max-workers=2 --no-parallel ktlintCheck :order-service:test --tests '*RedisCancelTransactionTest' --tests '*RedisPurchaseFlowTest' --tests '*RedisOrderPersistenceTest' --tests '*RedisSaleStatusRaceTest'`의 관련 20개와 ktlint가 통과했다. 당시 전체 명령 `JAVA_TOOL_OPTIONS=-XX:ActiveProcessorCount=2 ./gradlew --max-workers=2 --no-parallel ktlintCheck :common:test :order-service:test`에서도 common 66개, order-service 294개가 통과했고 실패, 오류와 건너뜀은 모두 0이었다. 당시 Green 1개는 work/w2/drafts/redis-cancel-transaction-green.xml에 보관했고 실제 (CANCELED, stock 1)을 단언한다. |
 | 대신 한 것 | Redis 취소를 REQUIRES_NEW로 독립 커밋하고 정상 반환한 뒤에만 cancel.lua를 실행한다. ADR 0007과 08 시퀀스의 DB 커밋 뒤 복구 순서를 실제 트랜잭션 경계로 보장한다. 커밋 불확실과 가용성보다 초과 판매 방지를 우선하는 원칙은 [ADR 0021](https://github.com/moonino/dropgate/blob/main/docs/adr/0021-db-커밋이-불확실하면-재고를-복구하지-않는다.md)을 참고한다. 최종 Flow와 실제 회귀 테스트는 [PR #153](https://github.com/moonino/dropgate/pull/153)에 포함했다. |
