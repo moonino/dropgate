@@ -31,8 +31,10 @@ import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Named
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient
@@ -203,17 +205,9 @@ class KakaoLoginTest @Autowired constructor(
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["발급자", "만료시각", "사용자", "식별자"])
-    fun `리프레시의 필수 클레임이 없거나 틀리면 401이다`(claim: String) {
-        val token = signRefreshToken {
-            when (claim) {
-                "발급자" -> issuer("other-auth")
-                "만료시각" -> expirationTime(null)
-                "사용자" -> subject("not-a-uuid")
-                "식별자" -> jwtID(null)
-            }
-        }
-        expectUnauthenticatedResponse(refresh(token))
+    @MethodSource("invalidRefreshClaims")
+    fun `리프레시의 필수 클레임이 없거나 틀리면 401이다`(change: JWTClaimsSet.Builder.() -> Unit) {
+        expectUnauthenticatedResponse(refresh(signRefreshToken(change = change)))
     }
 
     @Test
@@ -589,6 +583,14 @@ class KakaoLoginTest @Autowired constructor(
 
     companion object {
         private val wiremock = WireMockServer(0).apply { start() }
+
+        @JvmStatic
+        fun invalidRefreshClaims(): List<Named<JWTClaimsSet.Builder.() -> Unit>> = listOf(
+            Named.of("발급자", { issuer("other-auth") }),
+            Named.of("만료시각", { expirationTime(null) }),
+            Named.of("사용자", { subject("not-a-uuid") }),
+            Named.of("식별자", { jwtID(null) }),
+        )
 
         @JvmStatic
         @DynamicPropertySource
