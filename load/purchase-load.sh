@@ -13,7 +13,10 @@ WORK_DIR="$ROOT_DIR/load/build/purchase-$PURCHASE_PATH-$RUN_ID"
 RESULTS_DIR="$ROOT_DIR/load/k6/results"
 SUMMARY_FILE="$RESULTS_DIR/purchase-$PURCHASE_PATH-$RUN_ID.json"
 RECONCILIATION_FILE="$RESULTS_DIR/reconcile-$PURCHASE_PATH-$RUN_ID.json"
+VALIDATED_FILE="$RESULTS_DIR/validated-$PURCHASE_PATH-$RUN_ID.json"
 ENVIRONMENT_FILE="$RESULTS_DIR/environment-$PURCHASE_PATH-$RUN_ID.txt"
+RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SOURCE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 
 POSTGRES_IMAGE="postgres:16-alpine"
 REDIS_IMAGE="redis:7.4-alpine"
@@ -260,6 +263,41 @@ print_summary() {
   }' "$SUMMARY_FILE"
 }
 
+write_validated_run() {
+  local jar_hash summary_hash reconciliation_hash
+  jar_hash="$(shasum -a 256 "$ORDER_JAR" | cut -d ' ' -f 1)"
+  summary_hash="$(shasum -a 256 "$SUMMARY_FILE" | cut -d ' ' -f 1)"
+  reconciliation_hash="$(shasum -a 256 "$RECONCILIATION_FILE" | cut -d ' ' -f 1)"
+  jq -n --arg runId "$RUN_ID" --arg path "$PURCHASE_PATH" --arg commit "$SOURCE_COMMIT" \
+    --arg startedAt "$RUN_STARTED_AT" --arg summary "$SUMMARY_FILE" --arg reconciliation "$RECONCILIATION_FILE" \
+    --arg environment "$ENVIRONMENT_FILE" --arg jarHash "$jar_hash" --arg summaryHash "$summary_hash" \
+    --arg reconciliationHash "$reconciliation_hash" --argjson requests "$REQUEST_COUNT" --argjson quantity "$TOTAL_QUANTITY" \
+    '{schemaVersion: 1, validated: true, runId: $runId, purchasePath: $path, sourceCommit: $commit,
+      startedAtUtc: $startedAt, summaryFile: $summary, reconciliationFile: $reconciliation,
+      environmentFile: $environment, jarSha256: $jarHash, summarySha256: $summaryHash,
+      reconciliationSha256: $reconciliationHash, requestCount: $requests, totalQuantity: $quantity}' \
+    >"$VALIDATED_FILE.tmp"
+  mv "$VALIDATED_FILE.tmp" "$VALIDATED_FILE"
+  log "검증 완료 기록: $VALIDATED_FILE"
+}
+
+verify_reconciliation() {
+  jq -e --argjson quantity "$TOTAL_QUANTITY" '.confirmed == $quantity and .canceled == 0 and
+    .status == "SOLD_OUT" and .outbox.failed == 0 and .outbox.published == $quantity and
+    .streamLength == $quantity' "$RECONCILIATION_FILE" >/dev/null || {
+    log "대조 완료 판정 실패: $RECONCILIATION_FILE"
+    return 1
+  }
+}
+
+verify_k6_summary() {
+  jq -e --argjson requests "$REQUEST_COUNT" --argjson quantity "$TOTAL_QUANTITY" '
+    .metrics.http_reqs.count == $requests and .metrics.purchase_confirmed.count == $quantity' "$SUMMARY_FILE" >/dev/null || {
+    log "k6 완료 판정 실패: $SUMMARY_FILE"
+    return 1
+  }
+}
+
 main() {
   trap cleanup EXIT
   trap 'exit 130' INT
@@ -282,8 +320,11 @@ main() {
   kill -0 "$ORDER_PID"
   wait_for_outbox
   print_accuracy_report "$drop_id"
+  verify_reconciliation
+  verify_k6_summary
   print_summary
   print_environment | tee "$ENVIRONMENT_FILE"
+  write_validated_run
 }
 
 main "$@"
