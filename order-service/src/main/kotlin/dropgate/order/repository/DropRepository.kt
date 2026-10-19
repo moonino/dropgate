@@ -1,17 +1,26 @@
 package dropgate.order.repository
 
 import dropgate.order.entity.DropEntity
+import dropgate.order.entity.DropStatus
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.Instant
+import java.util.Optional
 import java.util.UUID
 
 private const val LISTED_DROP_CONDITION = "status IN ('SCHEDULED', 'OPEN', 'SOLD_OUT')"
 private const val DROP_STATUS = "dropgate.order.entity.DropStatus"
 
 interface DropRepository : JpaRepository<DropEntity, UUID> {
+    @Query(value = "SELECT * FROM orders.drops WHERE id = :id FOR UPDATE", nativeQuery = true)
+    fun findForUpdate(@Param("id") id: UUID): Optional<DropEntity>
+
+    @Modifying
+    @Query("UPDATE DropEntity d SET d.status = :status WHERE d.id = :id AND d.status IN ($DROP_STATUS.OPEN, $DROP_STATUS.SOLD_OUT)")
+    fun updateSaleStatusIfSelling(@Param("id") id: UUID, @Param("status") status: DropStatus)
+
     @Query("SELECT d FROM DropEntity d WHERE d.status = $DROP_STATUS.OPEN AND d.stockInitializationClaimed = false ORDER BY d.id")
     fun findOpenDropsAwaitingStockInitialization(): List<DropEntity>
 
