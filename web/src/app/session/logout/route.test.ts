@@ -61,7 +61,7 @@ describe("POST /session/logout", () => {
     expect(logout).not.toHaveBeenCalled();
   });
 
-  it("실패한 백엔드 호출을 서버에만 기록한다", async () => {
+  it("실패한 백엔드 호출을 서버 로그에 기록한다", async () => {
     server.use(http.post(`${AUTH}/auth/logout`, () => new HttpResponse(null, { status: 503 })));
     await POST(createLogoutRequest());
     expect(console.error).toHaveBeenCalledWith("백엔드 로그아웃에 실패했습니다", 503);
