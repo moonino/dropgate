@@ -13,7 +13,7 @@
 | auth | GET /auth/me | Bearer | 내 정보 |
 | auth | GET /.well-known/jwks.json | 없음 | 공개키 |
 | order | POST /api/admin/drops | Bearer ADMIN | 드롭 등록 |
-| order | GET /api/drops | 없음 | 목록 |
+| order | GET /api/drops | 없음 | 목록, 남은 수량 |
 | order | GET /api/drops/{dropId} | 없음 | 단건, 남은 수량 |
 | order | POST /api/drops/{dropId}/queue | Bearer | 대기열 진입 |
 | order | GET /api/drops/{dropId}/queue/me | Bearer | 순번과 입장 상태 |
@@ -42,23 +42,23 @@
 | 400 | VALIDATION_FAILED | 전부 | errors에 필드별 메시지 |
 | 401 | UNAUTHENTICATED | 전부 | 토큰 없음, 만료, 서명 불일치, 무효화됨, 리프레시 없음 |
 | 403 | FORBIDDEN | 관리자 API, 타인 주문 취소 | |
-| 403 | NOT_ADMITTED | 구매 | 입장 전이거나 입장 60초 만료 |
+| 403 | NOT_ADMITTED | 구매 | 입장 전이거나 입장 60초 만료. 대기열 확인이 꺼져 있으면 나오지 않음 |
 | 404 | DROP_NOT_FOUND | 드롭 | |
 | 404 | ORDER_NOT_FOUND | 주문 | |
 | 404 | JOB_EXECUTION_NOT_FOUND | 배치 | |
-| 409 | DROP_NOT_OPEN | 대기열, 구매 | SCHEDULED 또는 CLOSED |
+| 409 | DROP_NOT_OPEN | 대기열, 구매 | SCHEDULED, CLOSED, Redis 초기화 전 또는 마감 시각 이후 |
 | 409 | SOLD_OUT | 대기열, 구매 | |
-| 409 | ALREADY_PURCHASED | 대기열, 구매 | 취소한 사용자도 포함 |
+| 409 | ALREADY_PURCHASED | 대기열, 구매 | 취소한 사용자도 포함. Lua 성공 뒤 orders INSERT 0행도 보상 후 이 코드 |
 | 409 | ORDER_ALREADY_CANCELED | 취소 | |
 | 409 | DROP_CLOSED | 취소 | 마감 뒤 취소 불가 |
 | 409 | JOB_ALREADY_RUNNING | 배치 | |
 | 502 | KAKAO_UNAVAILABLE | 로그인 | 카카오 응답 실패나 3초 초과 |
 | 503 | AUTH_UNAVAILABLE | 로그인 콜백, 재발급, 로그아웃, 모든 Bearer 엔드포인트의 토큰 검증 | 무효화 목록이나 리프레시 Redis 명령 실패나 200ms 초과. 토큰 검증의 JWKS 조회 실패, 연결 3초나 읽기 3초 초과, 형식 오류(ADR 0018). Retry-After 2 |
 | 503 | STOCK_UNAVAILABLE | 대기열, 구매 | 재고와 대기열 Redis 명령 실패나 200ms 초과. Retry-After 2 |
-| 503 | ORDER_PERSIST_FAILED | 구매 | Lua 성공 뒤 DB 실패, Redis 보상 완료. Retry-After 2 |
+| 503 | ORDER_PERSIST_FAILED | 구매 | Lua 성공 뒤 DB 예외로 Redis 보상 시도. 보상 실패도 코드는 유지하고 카운터와 error 로그로 남김. Retry-After 2 |
 | 503 | NOTIFICATION_UNAVAILABLE | 피드 | DynamoDB 실패 |
 
-구매에서 코드가 나오는 순서는 Lua 반환 순서와 같다. DROP_NOT_OPEN, NOT_ADMITTED, ALREADY_PURCHASED, SOLD_OUT. 예외로 1주 차 DB만 경로(ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 SOLD_OUT이 ALREADY_PURCHASED보다 먼저 나올 수 있다.
+구매에서 코드가 나오는 순서는 Lua 반환 순서와 같다. DROP_NOT_OPEN, NOT_ADMITTED, ALREADY_PURCHASED, SOLD_OUT. 예외로 DB 경로(purchase-path=db, ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 SOLD_OUT이 ALREADY_PURCHASED보다 먼저 나올 수 있다.
 
 ## 계약 테스트
 

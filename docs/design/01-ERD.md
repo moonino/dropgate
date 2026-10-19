@@ -166,7 +166,7 @@ users는 auth 스키마, drops와 orders와 order_ledger와 outbox는 orders 스
 | event_type | varchar(50) | NOT NULL | 'order.confirmed', 'order.canceled' |
 | payload | jsonb | NOT NULL | 04 문서 스키마 |
 | status | varchar(20) | NOT NULL, CHECK (status IN ('PENDING','PUBLISHED','FAILED')), DEFAULT 'PENDING' | |
-| attempts | int | NOT NULL, DEFAULT 0 | 10회 넘으면 FAILED |
+| attempts | int | NOT NULL, DEFAULT 0 | Redis 연결 실패와 타임아웃을 뺀 실패 횟수. 10회째 FAILED(04 문서) |
 | created_at | timestamptz | NOT NULL, DEFAULT now() | |
 | published_at | timestamptz | NULL | |
 
