@@ -13,6 +13,8 @@ import org.hibernate.type.SqlTypes
 import java.time.Instant
 import java.util.UUID
 
+private const val MAX_PUBLISH_ATTEMPTS = 10
+
 @Entity
 @Table(name = "outbox", schema = "orders")
 class OutboxEntity(
@@ -41,5 +43,10 @@ class OutboxEntity(
     fun markPublished(at: Instant) {
         status = OutboxStatus.PUBLISHED
         publishedAt = at
+    }
+
+    fun recordFailure() {
+        attempts += 1
+        if (attempts >= MAX_PUBLISH_ATTEMPTS) status = OutboxStatus.FAILED
     }
 }
