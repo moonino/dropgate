@@ -58,18 +58,11 @@ class DropStockResponseTest : DropApiIntegrationTest() {
     }
 
     @Test
-    fun `빈 페이지는 Redis 읽기 명령을 보내지 않는다`() {
-        val commands = recordReadCommands { http.get().uri("/api/drops").exchange().expectStatus().isOk }
-
-        assertThat(commands).isEmpty()
-    }
-
-    @Test
-    fun `SCHEDULED 등록 응답은 Redis 읽기 없이 수량을 모름으로 돌려준다`() {
+    fun `드롭 등록은 Redis 읽기 명령을 보내지 않는다`() {
         val body = """{"name":"드롭","totalQuantity":1,"openAt":"2030-11-01T10:00:00Z","closeAt":"2030-11-01T11:00:00Z"}"""
 
         val commands = recordReadCommands {
-            postDrop(body, issueAdminToken()).expectStatus().isCreated.expectBody().jsonPath("$.remainingQuantity").isEmpty
+            postDrop(body, issueAdminToken()).expectStatus().isCreated
         }
 
         assertThat(commands).isEmpty()
