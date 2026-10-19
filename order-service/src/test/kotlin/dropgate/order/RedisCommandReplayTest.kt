@@ -23,7 +23,7 @@ private val COMMAND_TIMEOUT = Duration.ofSeconds(2)
 class RedisCommandReplayTest {
     @Test
     fun `응답이 유실된 Lua는 재연결 뒤 다시 실행되지 않는다`() {
-        ReplayRedisContainer().use { redis ->
+        RedisTestContainer().use { redis ->
             redis.start()
             RedisReplyDropper(redis.host, redis.getMappedPort(REDIS_PORT)).use { proxy ->
                 val connections = createConnectionFactory(proxy.port)
@@ -56,19 +56,19 @@ class RedisCommandReplayTest {
     }
 
     private fun readAfterReconnect(template: StringRedisTemplate, key: String): String {
-        var lastFailure: RuntimeException = IllegalStateException("Redis 재연결이 완료되지 않았습니다")
+        var lastFailure: DataAccessException? = null
         repeat(RECONNECT_READ_ATTEMPTS) {
             try {
-                return template.opsForValue().get(key) ?: error("실행한 Lua의 수량 키가 없습니다: $key")
+                return template.opsForValue().get(key) ?: error("실행한 Lua의 카운터 키가 없습니다: $key")
             } catch (exception: DataAccessException) {
                 lastFailure = exception
                 Thread.sleep(RECONNECT_READ_DELAY_MILLIS)
             }
         }
-        throw IllegalStateException("Redis 재연결 뒤 수량을 읽지 못했습니다", lastFailure)
+        throw IllegalStateException("Redis 재연결 뒤 카운터를 읽지 못했습니다", lastFailure)
     }
 
-    private class ReplayRedisContainer : GenericContainer<ReplayRedisContainer>("redis:7.4-alpine") {
+    private class RedisTestContainer : GenericContainer<RedisTestContainer>("redis:7.4-alpine") {
         init {
             withExposedPorts(REDIS_PORT)
         }

@@ -37,6 +37,11 @@ class RedisReplyDropper(private val targetHost: String, private val targetPort: 
         upstream.connect(InetSocketAddress(targetHost, targetPort), CONNECT_TIMEOUT_MILLIS)
         connections.add(client)
         connections.add(upstream)
+        relayCommands(client, upstream)
+        relayReplies(client, upstream)
+    }
+
+    private fun relayCommands(client: Socket, upstream: Socket) {
         workers.submit {
             try {
                 client.getInputStream().transferTo(upstream.getOutputStream())
@@ -46,6 +51,9 @@ class RedisReplyDropper(private val targetHost: String, private val targetPort: 
                 closeConnection(client, upstream)
             }
         }
+    }
+
+    private fun relayReplies(client: Socket, upstream: Socket) {
         workers.submit {
             try {
                 val buffer = ByteArray(REPLY_BUFFER_BYTES)
