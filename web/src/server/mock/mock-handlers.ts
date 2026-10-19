@@ -1,31 +1,44 @@
 import { http, HttpResponse, type HttpHandler } from "msw";
 import type { CreateDropRequest, FieldError, User } from "@/api/types";
 import { readMockBaseUrl } from "../config";
-import { MOCK_USERS, type MockRejection, type MockResult, type MockStore, type NewDrop } from "./mock-store";
+import { type MockRejection, type MockResult, type MockStore, type NewDrop } from "./mock-store";
+import type { MockSessionStore } from "./mock-session-store";
 
 const DEFAULT_PAGE_LIMIT = 20;
 const DEFAULT_ADMISSION_RATE = 50;
 const MAX_NAME_LENGTH = 100;
 const MAX_ADMISSION_RATE = 10_000;
 
-export function createMockHandlers(store: MockStore): HttpHandler[] {
+export function createMockHandlers(store: MockStore, sessions: MockSessionStore): HttpHandler[] {
   const auth = readMockBaseUrl("auth");
   const order = readMockBaseUrl("order");
   return [
-    http.get(`${auth}/auth/me`, ({ request }) => respondAsUser(request, (user) => HttpResponse.json(user))),
+    http.get(`${auth}/auth/me`, ({ request }) => respondAsUser(request, sessions, (user) => HttpResponse.json(user))),
+    http.post(`${auth}/auth/token/refresh`, async ({ request }) => {
+      const body: unknown = await request.json();
+      const token = typeof body === "object" && body !== null && "refreshToken" in body ? body.refreshToken : undefined;
+      if (typeof token !== "string") {
+        return HttpResponse.json({ code: "VALIDATION_FAILED", message: "입력값이 올바르지 않습니다", errors: [{ field: "refreshToken", message: "필수 값이 없습니다" }] }, { status: 400 });
+      }
+      return respond(sessions.rotateTokenPair(token));
+    }),
+    http.post(`${auth}/auth/logout`, ({ request }) => {
+      const result = sessions.logout(readBearerToken(request));
+      return result.kind === "ok" ? new HttpResponse(null, { status: 204 }) : respondWithRejection(result.rejection);
+    }),
     http.get(`${order}/api/drops`, ({ request }) => HttpResponse.json(paginate(store.listDrops(), new URL(request.url)))),
     http.get(`${order}/api/drops/:dropId`, ({ params }) => respond(store.getDrop(String(params.dropId)))),
     http.post(`${order}/api/drops/:dropId/orders`, ({ request, params }) =>
-      respondAsUser(request, (user) => respond(store.purchase(String(params.dropId), user), 201)),
+      respondAsUser(request, sessions, (user) => respond(store.purchase(String(params.dropId), user), 201)),
     ),
     http.post(`${order}/api/orders/:orderId/cancel`, ({ request, params }) =>
-      respondAsUser(request, (user) => respond(store.cancel(String(params.orderId), user))),
+      respondAsUser(request, sessions, (user) => respond(store.cancel(String(params.orderId), user))),
     ),
     http.get(`${order}/api/orders/me`, ({ request }) =>
-      respondAsUser(request, (user) => HttpResponse.json(paginate(store.listOrders(user), new URL(request.url)))),
+      respondAsUser(request, sessions, (user) => HttpResponse.json(paginate(store.listOrders(user), new URL(request.url)))),
     ),
     http.post(`${order}/api/admin/drops`, async ({ request }) => {
-      const found = readUser(request);
+      const found = sessions.authenticate(readBearerToken(request));
       if (found.kind === "rejected") return respondWithRejection(found.rejection);
       if (found.value.role !== "ADMIN") return respondWithRejection({ status: 403, code: "FORBIDDEN", message: "관리자만 할 수 있습니다" });
       const body = (await request.json()) as CreateDropRequest;
@@ -36,14 +49,12 @@ export function createMockHandlers(store: MockStore): HttpHandler[] {
   ];
 }
 
-function readUser(request: Request): MockResult<User> {
-  const token = request.headers.get("Authorization")?.replace(/^Bearer /, "") ?? "";
-  const user = MOCK_USERS[token];
-  return user ? { kind: "ok", value: user } : { kind: "rejected", rejection: { status: 401, code: "UNAUTHENTICATED", message: "로그인이 필요합니다" } };
+function readBearerToken(request: Request): string {
+  return request.headers.get("Authorization")?.replace(/^Bearer /, "") ?? "";
 }
 
-function respondAsUser(request: Request, handle: (user: User) => Response): Response {
-  const found = readUser(request);
+function respondAsUser(request: Request, sessions: MockSessionStore, handle: (user: User) => Response): Response {
+  const found = sessions.authenticate(readBearerToken(request));
   return found.kind === "ok" ? handle(found.value) : respondWithRejection(found.rejection);
 }
 
