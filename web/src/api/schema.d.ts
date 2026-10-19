@@ -97,7 +97,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 리프레시 토큰으로 새 토큰 쌍 발급. 옛 리프레시는 폐기(회전) */
+        /**
+         * 리프레시 토큰으로 새 토큰 쌍 발급. 옛 리프레시는 폐기(회전)
+         * @description 유효한 동일 리프레시는 최초 소비 요청만 200이고 재사용하거나 동시에 소비한 나머지는 401이다.
+         */
         post: {
             parameters: {
                 query?: never;
