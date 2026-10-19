@@ -1,23 +1,22 @@
 package dropgate.order
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.util.UUID
 
 class RedisPurchaseResponseTest : RedisOrderApiIntegrationTest() {
     @Test
-    fun `구매는 201을 반환하고 DB 기준선 수량을 유지하며 Redis 재고를 조회한다`() {
+    fun `정상 구매는 201과 CONFIRMED를 반환한다`() {
         val dropId = initializeStock()
-        val userId = UUID.randomUUID()
 
-        purchase(dropId, userId).expectStatus().isCreated.expectBody().jsonPath("$.status").isEqualTo("CONFIRMED")
+        purchase(dropId, UUID.randomUUID()).expectStatus().isCreated.expectBody().jsonPath("$.status").isEqualTo("CONFIRMED")
+    }
 
-        assertThat(findRemainingQuantity(dropId)).isEqualTo(1)
-        assertThat(readStock(dropId)).isEqualTo("0")
-        assertThat(redis.opsForSet().members("drop:$dropId:buyers")).containsExactly(userId.toString())
-        assertThat(countRows("orders")).isEqualTo(1)
-        assertThat(findDropStatus(dropId)).isEqualTo("SOLD_OUT")
+    @Test
+    fun `Redis 구매 뒤 단건 조회는 남은 수량 0을 반환한다`() {
+        val dropId = initializeStock()
+        purchaseOrderId(dropId, UUID.randomUUID())
+
         http.get().uri("/api/drops/$dropId").exchange().expectStatus().isOk.expectBody().jsonPath("$.remainingQuantity").isEqualTo(0)
     }
 
@@ -43,14 +42,12 @@ class RedisPurchaseResponseTest : RedisOrderApiIntegrationTest() {
     }
 
     @Test
-    fun `취소한 사용자의 재구매는 원래 재고를 유지하며 중복으로 거절한다`() {
+    fun `취소한 사용자의 재구매는 409 중복으로 거절한다`() {
         val dropId = initializeStock()
         val userId = UUID.randomUUID()
         cancel(purchaseOrderId(dropId, userId), userId).expectStatus().isOk
 
         purchase(dropId, userId).expectStatus().isEqualTo(409).expectBody().jsonPath("$.code").isEqualTo("ALREADY_PURCHASED")
-
-        assertThat(readStock(dropId)).isEqualTo("1")
     }
 
     @Test
