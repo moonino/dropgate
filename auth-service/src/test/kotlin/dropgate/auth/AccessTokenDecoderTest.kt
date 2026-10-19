@@ -5,10 +5,9 @@ import dropgate.auth.entity.UserEntity
 import dropgate.auth.service.AccessTokenDecoder
 import dropgate.auth.service.JwtTokenService
 import dropgate.common.UuidV7Generator
-import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -35,15 +34,11 @@ class AccessTokenDecoderTest {
     @ValueSource(longs = [0, 1])
     fun `만료 시각부터 토큰을 거부하고 예외에 이유를 남긴다`(secondsAfterExpiry: Long) {
         val decoder = AccessTokenDecoder(key, Clock.offset(clock, Duration.ofMinutes(15).plusSeconds(secondsAfterExpiry)))
-        assertUnauthenticated { decoder.decodeUserId("Bearer ${tokens.accessToken}") }.hasMessageContaining("exp")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { decoder.decodeUserId("Bearer ${tokens.accessToken}") }.hasMessageContaining("exp")
     }
 
     @Test
     fun `리프레시 토큰을 거부한 이유를 예외에 남긴다`() {
-        assertUnauthenticated { AccessTokenDecoder(key, clock).decodeUserId("Bearer ${tokens.refreshToken}") }.hasMessageContaining("리프레시 토큰")
-    }
-
-    private fun assertUnauthenticated(decode: () -> Unit) = assertThatThrownBy { decode() }.isInstanceOfSatisfying(DropgateException::class.java) {
-        assertThat(it.errorCode).isEqualTo(ErrorCode.UNAUTHENTICATED)
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { AccessTokenDecoder(key, clock).decodeUserId("Bearer ${tokens.refreshToken}") }.hasMessageContaining("리프레시 토큰")
     }
 }

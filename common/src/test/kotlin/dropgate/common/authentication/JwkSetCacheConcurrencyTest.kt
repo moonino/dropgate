@@ -3,6 +3,7 @@ package dropgate.common.authentication
 import com.nimbusds.jose.jwk.JWKSet
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Duration
@@ -22,7 +23,7 @@ class JwkSetCacheConcurrencyTest {
         val fetcher = BlockingJwkSetFetcher { throw DropgateException(ErrorCode.AUTH_UNAVAILABLE, "테스트 JWKS 조회 실패") }
         val outcomes = requestTwiceWhileFirstFetchBlocks(JwkSetCache(fetcher, clock), fetcher)
         assertThat(outcomes).allSatisfy { outcome ->
-            assertThat(outcome.exceptionOrNull()).isInstanceOfSatisfying(DropgateException::class.java) { assertThat(it.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE) }
+            assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { outcome.getOrThrow() }
         }
         assertThat(fetcher.fetchCount).isEqualTo(1)
     }

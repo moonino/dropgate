@@ -2,9 +2,9 @@ package dropgate.common.authentication
 
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import java.time.Duration
 import java.time.Instant
 
@@ -39,7 +39,7 @@ class JwkSetCacheTest {
 
     @Test
     fun `JWKS 형식이 깨졌으면 AUTH_UNAVAILABLE로 거부한다`() {
-        assertAuthUnavailable(JwkSetCache({ "not-json" }, clock))
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { JwkSetCache({ "not-json" }, clock).getCurrentKeys() }
     }
 
     @Test
@@ -47,20 +47,15 @@ class JwkSetCacheTest {
         val failingAfterFirst = JwkSetCache(CountingJwkSetFetcher { attempt -> if (attempt == 1) JWK_SET_JSON else throw createFetchFailure() }, clock)
         failingAfterFirst.getCurrentKeys()
         clock.advance(JWKS_CACHE_TTL)
-        assertAuthUnavailable(failingAfterFirst)
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { failingAfterFirst.getCurrentKeys() }
     }
 
     @Test
     fun `조회가 실패한 뒤에 온 요청은 JWKS를 다시 받는다`() {
         val recovering = CountingJwkSetFetcher { attempt -> if (attempt == 1) throw createFetchFailure() else JWK_SET_JSON }
         val recoveringCache = JwkSetCache(recovering, clock)
-        assertAuthUnavailable(recoveringCache)
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { recoveringCache.getCurrentKeys() }
         assertThat(recoveringCache.getCurrentKeys().getKeyByKeyId("test-key")).isNotNull()
-    }
-
-    private fun assertAuthUnavailable(target: JwkSetCache) {
-        val exception = assertThrows<DropgateException> { target.getCurrentKeys() }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE)
     }
 
     private fun createFetchFailure() = DropgateException(ErrorCode.AUTH_UNAVAILABLE, "테스트 JWKS 조회 실패")
