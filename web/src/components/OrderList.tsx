@@ -4,15 +4,17 @@ import { useState, useTransition } from "react";
 import type { Order, OrderPage } from "@/api/types";
 import { decideCancelControl, type CancelControl, type CancelOutcome, type CancelRejection } from "@/domain/cancel";
 import { appendRetryAfter } from "@/domain/retry";
+import type { SessionActionResult } from "@/domain/session-action";
 import { ORDER_STATUS_BADGES } from "@/domain/status";
 import { formatKstStamp } from "@/domain/time";
 import type { BackendResult } from "@/server/backend";
 import { StatusBadge } from "./StatusBadge";
+import { navigateToSessionRecovery } from "./session-navigation";
 
 type OrderListProps = {
   firstPage: OrderPage;
-  cancel: (orderId: string) => Promise<CancelOutcome>;
-  loadPage: (cursor: string) => Promise<BackendResult<OrderPage>>;
+  cancel: (orderId: string) => Promise<SessionActionResult<CancelOutcome>>;
+  loadPage: (cursor: string) => Promise<SessionActionResult<BackendResult<OrderPage>>>;
 };
 
 export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
@@ -25,6 +27,7 @@ export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
   const cancelOne = (orderId: string) =>
     startTransition(async () => {
       const outcome = await cancel(orderId);
+      if (outcome.kind === "refresh-required") return navigateToSessionRecovery();
       if (outcome.kind === "canceled") {
         setOrders((current) => current.map((order) => (order.id === orderId ? outcome.order : order)));
         setNotice("주문을 취소했습니다. 수량 1개가 드롭으로 돌아갔습니다.");
@@ -37,6 +40,7 @@ export function OrderList({ firstPage, cancel, loadPage }: OrderListProps) {
   const loadMore = (cursor: string) =>
     startTransition(async () => {
       const result = await loadPage(cursor);
+      if (result.kind === "refresh-required") return navigateToSessionRecovery();
       if (result.kind === "unavailable") {
         setNotice(result.notice);
         return;
