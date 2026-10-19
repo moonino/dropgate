@@ -6,6 +6,10 @@ const SESSION_EXPIRED_PATH = "/session/expired";
 export type PageSearchParams = Record<string, string | string[] | undefined>;
 export type SessionRecoveryContext = { path: string; search: URLSearchParams; hash?: string };
 
+export function isRefreshed(search: URLSearchParams): boolean {
+  return search.get(REFRESHED_PARAMETER) === REFRESHED_VALUE;
+}
+
 export function createPageRecoveryContext(path: string, values: PageSearchParams): SessionRecoveryContext {
   const search = new URLSearchParams();
   for (const [name, value] of Object.entries(values)) {
@@ -16,7 +20,7 @@ export function createPageRecoveryContext(path: string, values: PageSearchParams
 }
 
 export function createSessionRecoveryPath(context: SessionRecoveryContext): string {
-  if (context.search.get(REFRESHED_PARAMETER) === REFRESHED_VALUE) return SESSION_EXPIRED_PATH;
+  if (isRefreshed(context.search)) return SESSION_EXPIRED_PATH;
   const query = context.search.toString();
   const next = context.path + (query ? `?${query}` : "") + (context.hash ?? "");
   return `${SESSION_REFRESH_PATH}?${new URLSearchParams({ next })}`;
