@@ -14,16 +14,30 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Instant
 import java.util.UUID
 
+private const val MINIMUM_RESTORED_QUANTITY = 1L
+private const val SALE_ALREADY_OPEN = 0L
+private const val SALE_REOPENED = 1L
+
 @Repository
 class DropStockRepository(private val redis: StringRedisTemplate, private val settings: OrderProperties) {
     private val initialization = DefaultRedisScript(ClassPathResource("redis/init.lua").getContentAsString(UTF_8), Long::class.java)
     private val reservation = DefaultRedisScript(ClassPathResource("redis/purchase.lua").getContentAsString(UTF_8), List::class.java)
+    private val compensation = DefaultRedisScript(ClassPathResource("redis/compensate.lua").getContentAsString(UTF_8), Long::class.java)
+    private val cancellation = DefaultRedisScript(ClassPathResource("redis/cancel.lua").getContentAsString(UTF_8), Long::class.java)
+
+    fun compensate(dropId: UUID, userId: UUID) {
+        if (restore(dropId, userId, compensation) < MINIMUM_RESTORED_QUANTITY) throw createRestorationFailure(dropId, userId)
+    }
+
+    fun cancel(dropId: UUID, userId: UUID) {
+        if (restore(dropId, userId, cancellation) !in SALE_ALREADY_OPEN..SALE_REOPENED) throw createRestorationFailure(dropId, userId)
+    }
 
     fun purchase(dropId: UUID, userId: UUID, now: Instant): StockReservation {
         val result = execute(
             "드롭 $dropId 사용자 $userId 구매",
             reservation,
-            listOf(createKey(dropId, "stock"), createKey(dropId, "buyers"), createKey(dropId, "admit:$userId"), createKey(dropId, "meta")),
+            listOf(createDropRedisKey(dropId, "stock"), createDropRedisKey(dropId, "buyers"), createDropRedisKey(dropId, "admit:$userId"), createDropRedisKey(dropId, "meta")),
             userId.toString(),
             now.toEpochMilli().toString(),
             if (settings.queue.enabled) "1" else "0",
@@ -36,7 +50,7 @@ class DropStockRepository(private val redis: StringRedisTemplate, private val se
         execute(
             "드롭 ${drop.id} 초기화",
             initialization,
-            listOf(createKey(drop.id, "stock"), createKey(drop.id, "meta")),
+            listOf(createDropRedisKey(drop.id, "stock"), createDropRedisKey(drop.id, "meta")),
             drop.totalQuantity.toString(),
             drop.openAt.toEpochMilli().toString(),
             drop.closeAt.toEpochMilli().toString(),
@@ -44,7 +58,17 @@ class DropStockRepository(private val redis: StringRedisTemplate, private val se
         )
     }
 
-    private fun createKey(dropId: UUID, suffix: String): String = "drop:$dropId:$suffix"
+    private fun restore(dropId: UUID, userId: UUID, script: RedisScript<Long>): Long = execute(
+        "드롭 $dropId 사용자 $userId 재고 복구",
+        script,
+        listOf(createDropRedisKey(dropId, "stock"), createDropRedisKey(dropId, "buyers"), createDropRedisKey(dropId, "meta")),
+        userId.toString(),
+    )
+
+    private fun createRestorationFailure(dropId: UUID, userId: UUID): DropgateException = DropgateException(
+        ErrorCode.STOCK_UNAVAILABLE,
+        "드롭 $dropId 사용자 $userId 의 재고 복구 키가 없습니다",
+    )
 
     private fun <T : Any> execute(context: String, script: RedisScript<T>, keys: List<String>, vararg arguments: String): T {
         try {
