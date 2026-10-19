@@ -4,6 +4,8 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.ResultActionsDsl
 import org.springframework.test.web.servlet.get
@@ -18,25 +20,43 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 private const val NAME_TOO_LONG_MESSAGE = "이름은 3자 이하여야 합니다"
-private const val LIMIT_TOO_SMALL_MESSAGE = "limit은 1 이상이어야 합니다"
+private const val PAGE_SIZE_TOO_SMALL_MESSAGE = "page_size는 1 이상이어야 합니다"
 
 class GlobalExceptionHandlerInputTest {
     private val mvc = MockMvcBuilders.standaloneSetup(InputController()).setControllerAdvice(GlobalExceptionHandler()).build()
 
     @Test
     fun `필수 쿼리 파라미터가 없으면 그 이름을 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/orders").expectValidationFailure("limit")
+        mvc.get("/inputs/orders").expectValidationFailure("page_size")
+    }
+
+    @Test
+    fun `쿼리 파라미터 형식이 맞지 않으면 요청 이름을 errors에 담는다`() {
+        mvc.get("/inputs/orders?page_size=invalid").expectValidationFailure("page_size")
     }
 
     @Test
     fun `경로 변수 형식이 맞지 않으면 그 이름을 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/drops/not-a-uuid").expectValidationFailure("dropId")
+        mvc.get("/inputs/drops/not-a-uuid").expectValidationFailure("item_id")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "/inputs/orders?page_size=0, page_size",
+        "/inputs/named-orders?page_size=0, page_size",
+        "/inputs/default-orders?pageSize=0, pageSize",
+        "/inputs/items/0, item_id",
+        "/inputs/named-items/0, item_id",
+        "/inputs/default-items/0, itemId",
+    )
+    fun `제약 위반 필드는 요청에 선언한 이름을 따른다`(uri: String, field: String) {
+        mvc.get(uri).expectValidationFailure(field)
     }
 
     @Test
-    fun `파라미터 제약을 어기면 제약 메시지를 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/orders?limit=0").expectValidationFailure("limit").andExpect {
-            jsonPath("$.errors[0].message") { value(LIMIT_TOO_SMALL_MESSAGE) }
+    fun `파라미터 제약 위반 메시지를 errors에 담는다`() {
+        mvc.get("/inputs/orders?page_size=0").andExpect {
+            jsonPath("$.errors[0].message") { value(PAGE_SIZE_TOO_SMALL_MESSAGE) }
         }
     }
 
@@ -72,10 +92,25 @@ class GlobalExceptionHandlerInputTest {
     @RestController
     private class InputController {
         @GetMapping("/inputs/orders")
-        fun readOrders(@RequestParam("limit") @Min(1, message = LIMIT_TOO_SMALL_MESSAGE) limit: Int): Int = limit
+        fun readOrders(@RequestParam("page_size") @Min(1, message = PAGE_SIZE_TOO_SMALL_MESSAGE) pageSize: Int): Int = pageSize
 
-        @GetMapping("/inputs/drops/{dropId}")
-        fun readDrop(@PathVariable("dropId") dropId: UUID): UUID = dropId
+        @GetMapping("/inputs/named-orders")
+        fun readNamedOrders(@RequestParam(name = "page_size") @Min(1) pageSize: Int): Int = pageSize
+
+        @GetMapping("/inputs/default-orders")
+        fun readDefaultOrders(@RequestParam @Min(1) pageSize: Int): Int = pageSize
+
+        @GetMapping("/inputs/items/{item_id}")
+        fun readItem(@PathVariable("item_id") @Min(1) itemId: Int): Int = itemId
+
+        @GetMapping("/inputs/named-items/{item_id}")
+        fun readNamedItem(@PathVariable(name = "item_id") @Min(1) itemId: Int): Int = itemId
+
+        @GetMapping("/inputs/default-items/{itemId}")
+        fun readDefaultItem(@PathVariable @Min(1) itemId: Int): Int = itemId
+
+        @GetMapping("/inputs/drops/{item_id}")
+        fun readDrop(@PathVariable("item_id") itemId: UUID): UUID = itemId
 
         @PostMapping("/inputs/drops")
         fun createDrop(@RequestBody @Valid request: DropInput): String = request.name
