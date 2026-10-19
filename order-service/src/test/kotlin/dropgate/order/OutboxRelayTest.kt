@@ -30,7 +30,7 @@ class OutboxRelayTest : OrderApiIntegrationTest() {
     }
 
     @Test
-    fun `구매 이벤트를 발행하면 outbox에 발행 상태와 시각을 남긴다`() {
+    fun `릴레이는 스트림에 구매 사건을 발행하고 DB 발행 상태와 시각을 남긴다`() {
         purchaseOrderId(insertDropWithStock(), UUID.randomUUID())
         val before = Instant.now()
 
