@@ -3,6 +3,11 @@ package dropgate.order.event
 import dropgate.order.UTC_JSON_TIMEZONE
 import dropgate.order.UTC_MILLIS_JSON_PATTERN
 import dropgate.order.entity.OutboxEntity
+import io.lettuce.core.RedisCommandExecutionException
+import io.lettuce.core.RedisException
+import org.springframework.dao.DataAccessException
+import org.springframework.dao.QueryTimeoutException
+import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.connection.RedisStreamCommands.TrimOptions
 import org.springframework.data.redis.connection.RedisStreamCommands.XAddOptions
 import org.springframework.data.redis.core.StringRedisTemplate
@@ -19,11 +24,26 @@ private val EVENT_TIME_FORMAT = DateTimeFormatter.ofPattern(UTC_MILLIS_JSON_PATT
 @Component
 class OrderEventStream(private val redis: StringRedisTemplate, private val jsonMapper: ObjectMapper) {
     fun publish(event: OutboxEntity) {
-        redis.opsForStream<String, String>().add(
-            ORDER_EVENT_STREAM,
-            createFields(event),
-            XAddOptions.trim(TrimOptions.maxLen(MAX_STREAM_LENGTH).approximate()),
-        )
+        val fields = createFields(event)
+        try {
+            redis.opsForStream<String, String>().add(
+                ORDER_EVENT_STREAM,
+                fields,
+                XAddOptions.trim(TrimOptions.maxLen(MAX_STREAM_LENGTH).approximate()),
+            )
+        } catch (exception: DataAccessException) {
+            val message = "outbox ${event.id} 의 ${event.eventType} Redis 발행에 실패했습니다"
+            if (isUnavailable(exception)) {
+                throw OrderEventStreamUnavailableException(message, exception)
+            }
+            throw IllegalStateException(message, exception)
+        }
+    }
+
+    private fun isUnavailable(exception: DataAccessException): Boolean {
+        if (exception is RedisConnectionFailureException || exception is QueryTimeoutException) return true
+        val causes = generateSequence<Throwable>(exception) { it.cause }
+        return causes.none { it is RedisCommandExecutionException } && causes.any { it.javaClass == RedisException::class.java }
     }
 
     private fun createFields(event: OutboxEntity): Map<String, String> = mapOf(
