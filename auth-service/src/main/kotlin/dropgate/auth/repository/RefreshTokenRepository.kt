@@ -10,15 +10,25 @@ import org.springframework.stereotype.Repository
 import java.time.Duration
 import java.util.UUID
 
+private const val SCRIPT_SUCCEEDED = 1L
+
 @Repository
 class RefreshTokenRepository(private val redis: StringRedisTemplate) {
     private val storeScript = DefaultRedisScript<Long>().apply {
         setLocation(ClassPathResource("redis/store-refresh.lua"))
         resultType = Long::class.javaObjectType
     }
+    private val rotateScript = DefaultRedisScript<Long>().apply {
+        setLocation(ClassPathResource("redis/rotate-refresh.lua"))
+        resultType = Long::class.javaObjectType
+    }
 
     fun store(userId: UUID, tokenId: UUID, ttl: Duration) {
         execute(userId) { redis.execute(storeScript, listOf(refreshKey(userId, tokenId), indexKey(userId)), tokenId.toString(), ttl.toMillis().toString()) }
+    }
+
+    fun rotate(userId: UUID, oldTokenId: UUID, newTokenId: UUID, ttl: Duration): Boolean = execute(userId) {
+        redis.execute(rotateScript, listOf(refreshKey(userId, oldTokenId), refreshKey(userId, newTokenId), indexKey(userId)), oldTokenId.toString(), newTokenId.toString(), ttl.toMillis().toString()) == SCRIPT_SUCCEEDED
     }
 
     private fun <T> execute(userId: UUID, command: () -> T): T = try {
