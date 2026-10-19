@@ -2,6 +2,7 @@ package dropgate.common.error
 
 import org.springframework.context.MessageSourceResolvable
 import org.springframework.core.MethodParameter
+import org.springframework.core.annotation.AnnotatedElementUtils
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.validation.FieldError
@@ -51,9 +52,9 @@ class GlobalExceptionHandler {
     }
 
     private fun MethodParameter.readRequestName(): String {
-        val requestParam = getParameterAnnotation(RequestParam::class.java)
-        val pathVariable = getParameterAnnotation(PathVariable::class.java)
-        return sequenceOf(requestParam?.name, requestParam?.value, pathVariable?.name, pathVariable?.value, parameterName)
+        val requestParam = AnnotatedElementUtils.getMergedAnnotation(parameter, RequestParam::class.java)
+        val pathVariable = AnnotatedElementUtils.getMergedAnnotation(parameter, PathVariable::class.java)
+        return sequenceOf(requestParam?.name, pathVariable?.name, parameterName)
             .filterNotNull()
             .firstOrNull(String::isNotEmpty) ?: "arg$parameterIndex"
     }

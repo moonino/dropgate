@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 private const val NAME_TOO_LONG_MESSAGE = "이름은 3자 이하여야 합니다"
 private const val PAGE_SIZE_TOO_SMALL_MESSAGE = "page_size는 1 이상이어야 합니다"
@@ -37,7 +36,7 @@ class GlobalExceptionHandlerInputTest {
 
     @Test
     fun `경로 변수 형식이 맞지 않으면 그 이름을 errors에 담아 VALIDATION_FAILED로 답한다`() {
-        mvc.get("/inputs/drops/not-a-uuid").expectValidationFailure("item_id")
+        mvc.get("/inputs/items/invalid").expectValidationFailure("item_id")
     }
 
     @ParameterizedTest
@@ -108,9 +107,6 @@ class GlobalExceptionHandlerInputTest {
 
         @GetMapping("/inputs/default-items/{itemId}")
         fun readDefaultItem(@PathVariable @Min(1) itemId: Int): Int = itemId
-
-        @GetMapping("/inputs/drops/{item_id}")
-        fun readDrop(@PathVariable("item_id") itemId: UUID): UUID = itemId
 
         @PostMapping("/inputs/drops")
         fun createDrop(@RequestBody @Valid request: DropInput): String = request.name
