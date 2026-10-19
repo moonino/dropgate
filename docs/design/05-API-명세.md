@@ -56,7 +56,7 @@
 | 502 | KAKAO_UNAVAILABLE | 로그인 | 카카오 응답 실패나 3초 초과 |
 | 503 | AUTH_UNAVAILABLE | 로그인 콜백, 재발급, 로그아웃, 모든 Bearer 엔드포인트의 토큰 검증 | 무효화 목록이나 리프레시 Redis 명령 실패나 200ms 초과. 토큰 검증의 JWKS 조회 실패, 연결 3초나 읽기 3초 초과, 형식 오류(ADR 0018). Retry-After 2 |
 | 503 | STOCK_UNAVAILABLE | 대기열, 구매 | 재고와 대기열 Redis 명령 실패나 200ms 초과. Retry-After 2 |
-| 503 | ORDER_PERSIST_FAILED | 구매 | Lua 성공 뒤 DB 예외로 Redis 보상 시도. 보상 실패도 코드는 유지하고 카운터와 error 로그로 남김. Retry-After 2 |
+| 503 | ORDER_PERSIST_FAILED | 구매 | Lua 성공 뒤 롤백 성공이 확인된 DB 실패만 Redis 보상. 커밋 결과 불확실이면 예약 유지와 수동 대조, 실제 주문은 확정됐을 수 있으므로 내 주문 조회로 확인. 보상 실패도 코드는 유지. 두 경우 각각 카운터와 error 로그. Retry-After 2(ADR 0021) |
 | 503 | NOTIFICATION_UNAVAILABLE | 피드 | DynamoDB 실패 |
 
 구매에서 코드가 나오는 순서는 Lua 반환 순서와 같다. DROP_NOT_OPEN, NOT_ADMITTED, ALREADY_PURCHASED, SOLD_OUT. 예외로 DB 경로(purchase-path=db, ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 SOLD_OUT이 ALREADY_PURCHASED보다 먼저 나올 수 있다.
