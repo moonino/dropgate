@@ -29,7 +29,7 @@ class AccessTokenDecoderTest {
     private val revoked = InMemoryRevokedAccessTokens()
 
     @Test
-    fun `만료 직전까지 주입한 Clock으로 검증한다`() {
+    fun `만료 직전의 토큰은 무효화 확인 뒤 통과한다`() {
         val decoder = AccessTokenDecoder(key, Clock.offset(clock, Duration.ofMinutes(15).minusNanos(1)), revoked)
         assertThat(decoder.decode("Bearer ${tokens.accessToken}").userId).isEqualTo(user.id)
         assertThat(revoked.lookupCount).isEqualTo(1)
@@ -37,14 +37,14 @@ class AccessTokenDecoderTest {
 
     @ParameterizedTest
     @ValueSource(longs = [0, 1])
-    fun `만료 시각부터 토큰을 거부하고 예외에 이유를 남긴다`(secondsAfterExpiry: Long) {
+    fun `만료 시각부터 토큰은 무효화 확인 전에 거부한다`(secondsAfterExpiry: Long) {
         val decoder = AccessTokenDecoder(key, Clock.offset(clock, Duration.ofMinutes(15).plusSeconds(secondsAfterExpiry)), revoked)
         assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { decoder.decode("Bearer ${tokens.accessToken}") }.hasMessageContaining("exp")
         assertThat(revoked.lookupCount).isZero()
     }
 
     @Test
-    fun `리프레시 토큰을 거부한 이유를 예외에 남긴다`() {
+    fun `리프레시 토큰은 무효화 확인 전에 거부한다`() {
         assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { AccessTokenDecoder(key, clock, revoked).decode("Bearer ${tokens.refreshToken}") }.hasMessageContaining("리프레시 토큰")
         assertThat(revoked.lookupCount).isZero()
     }
