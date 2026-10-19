@@ -171,7 +171,8 @@ class KakaoLoginTest @Autowired constructor(
 
     @Test
     fun `만료된 리프레시는 저장 키가 있어도 재발급할 수 없다`() {
-        expectUnauthenticatedResponse(refresh(signRefreshToken { expirationTime(Date.from(Instant.now().minusSeconds(1))) }))
+        val original = requestTokenPair()["refreshToken"] as String
+        expectUnauthenticatedResponse(refresh(signRefreshToken(original) { expirationTime(Date.from(Instant.now().minusSeconds(1))) }))
     }
 
     @Test
@@ -192,14 +193,16 @@ class KakaoLoginTest @Autowired constructor(
     @Test
     fun `리프레시는 nbf 직전에는 거부하고 해당 시각부터 허용한다`() {
         val notBefore = Instant.ofEpochSecond(Instant.now().epochSecond + 60)
-        val token = signRefreshToken { notBeforeTime(Date.from(notBefore)) }
+        val original = requestTokenPair()["refreshToken"] as String
+        val token = signRefreshToken(original) { notBeforeTime(Date.from(notBefore)) }
         assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { refreshDecoderAt(notBefore.minusNanos(1)).decode(token) }
         assertThat(refreshDecoderAt(notBefore).decode(token).userId).isEqualTo(UUID.fromString(SignedJWT.parse(token).jwtClaimsSet.subject))
     }
 
     @Test
     fun `다른 키로 서명한 리프레시를 거부한다`() {
-        expectUnauthenticatedResponse(refresh(signRefreshToken(key = JwtConfiguration().jwtSigningKey(generatePrivateKeyPem()))))
+        val original = requestTokenPair()["refreshToken"] as String
+        expectUnauthenticatedResponse(refresh(signRefreshToken(original, key = JwtConfiguration().jwtSigningKey(generatePrivateKeyPem()))))
     }
 
     @Test
@@ -212,7 +215,8 @@ class KakaoLoginTest @Autowired constructor(
     @ParameterizedTest
     @MethodSource("invalidRefreshClaims")
     fun `리프레시의 필수 클레임이 없거나 틀리면 401이다`(change: JWTClaimsSet.Builder.() -> Unit) {
-        expectUnauthenticatedResponse(refresh(signRefreshToken(change = change)))
+        val original = requestTokenPair()["refreshToken"] as String
+        expectUnauthenticatedResponse(refresh(signRefreshToken(original, change = change)))
     }
 
     @Test
@@ -291,8 +295,8 @@ class KakaoLoginTest @Autowired constructor(
 
     private fun refresh(token: String, client: RestTestClient = http): RestTestClient.ResponseSpec = client.post().uri("/auth/token/refresh").body(mapOf("refreshToken" to token)).exchange()
 
-    private fun signRefreshToken(key: RSAKey = JwtConfiguration().jwtSigningKey(privateKeyPem), change: JWTClaimsSet.Builder.() -> Unit = {}): String {
-        val original = SignedJWT.parse(requestTokenPair()["refreshToken"] as String)
+    private fun signRefreshToken(originalToken: String, key: RSAKey = JwtConfiguration().jwtSigningKey(privateKeyPem), change: JWTClaimsSet.Builder.() -> Unit = {}): String {
+        val original = SignedJWT.parse(originalToken)
         return SignedJWT(original.header, JWTClaimsSet.Builder(original.jwtClaimsSet).apply(change).build()).apply { sign(RSASSASigner(key)) }.serialize()
     }
 
@@ -659,6 +663,7 @@ class KakaoLoginTest @Autowired constructor(
             Named.of("만료시각", { expirationTime(null) }),
             Named.of("사용자", { subject("not-a-uuid") }),
             Named.of("식별자", { jwtID(null) }),
+            Named.of("토큰 종류의 타입", { claim("typ", 1) }),
         )
 
         @JvmStatic

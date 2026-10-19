@@ -27,13 +27,13 @@ class RefreshTokenDecoder(key: RSAKey, clock: Clock) {
                     if (jwt.notBefore == null) OAuth2TokenValidatorResult.success() else notBeforeValidator.validate(jwt)
                 },
                 JwtIssuerValidator(ISSUER),
+                JwtClaimValidator<Any>("typ") { it == "refresh" },
             ),
         )
     }
 
     fun decode(token: String): VerifiedRefreshToken = try {
         val jwt = decoder.decode(token)
-        require(jwt.claims["typ"] == "refresh") { "리프레시 토큰이 아닙니다" }
         VerifiedRefreshToken(readIdentifier(jwt.subject, "sub"), readIdentifier(jwt.id, "jti"))
     } catch (cause: JwtException) {
         throw DropgateException(ErrorCode.UNAUTHENTICATED, "리프레시 토큰 검증 실패: ${cause.message}", cause = cause)
