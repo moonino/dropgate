@@ -19,7 +19,7 @@ class OrderCancelService(
     private val clock: Clock,
 ) {
     @Transactional
-    fun cancel(orderId: UUID, userId: UUID): OrderResponse {
+    fun cancel(orderId: UUID, userId: UUID): OrderWithDropName {
         val order = orders.findForUpdate(orderId).orElseThrow { DropgateException(ErrorCode.ORDER_NOT_FOUND, "주문이 없습니다: $orderId") }
         if (order.userId != userId) throw DropgateException(ErrorCode.FORBIDDEN, "사용자 $userId 는 남의 주문 $orderId 를 취소할 수 없습니다")
         if (order.status == OrderStatus.CANCELED) throw DropgateException(ErrorCode.ORDER_ALREADY_CANCELED, "이미 취소한 주문입니다: $orderId")
@@ -29,6 +29,6 @@ class OrderCancelService(
         drops.restoreOneUnitAndReopen(drop.id)
         order.cancel(canceledAt)
         history.recordCanceled(order, drop.name)
-        return OrderResponse.createFrom(order, drop.name)
+        return OrderWithDropName(order, drop.name)
     }
 }

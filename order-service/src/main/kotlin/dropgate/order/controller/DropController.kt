@@ -1,9 +1,10 @@
 package dropgate.order.controller
 
 import dropgate.common.authentication.AuthenticatedUser
+import dropgate.order.dto.CreateDropRequest
+import dropgate.order.dto.DropPageResponse
+import dropgate.order.dto.DropResponse
 import dropgate.order.service.DropCursor
-import dropgate.order.service.DropPageResponse
-import dropgate.order.service.DropResponse
 import dropgate.order.service.DropService
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
@@ -27,7 +28,7 @@ class DropController(private val drops: DropService) {
     @PostMapping("/api/admin/drops")
     fun createDrop(admin: AuthenticatedUser, @RequestBody @Valid request: CreateDropRequest): ResponseEntity<DropResponse> {
         val drop = drops.createDrop(request.toCommand(), admin.id)
-        return ResponseEntity.created(URI.create("/api/drops/${drop.id}")).body(drop)
+        return ResponseEntity.created(URI.create("/api/drops/${drop.id}")).body(DropResponse.createWithoutStock(drop))
     }
 
     @GetMapping("/api/drops")
@@ -37,8 +38,11 @@ class DropController(private val drops: DropService) {
         @Min(MIN_PAGE_LIMIT, message = "limit은 {value} 이상이어야 합니다")
         @Max(MAX_PAGE_LIMIT, message = "limit은 {value} 이하여야 합니다")
         limit: Int,
-    ): DropPageResponse = if (cursor == null) drops.getFirstDrops(limit) else drops.getDropsAfter(DropCursor.decode(cursor), limit)
+    ): DropPageResponse {
+        val page = if (cursor == null) drops.getFirstDrops(limit) else drops.getDropsAfter(DropCursor.decode(cursor), limit)
+        return DropPageResponse(page.items.map(DropResponse::createWithoutStock), page.nextCursor)
+    }
 
     @GetMapping("/api/drops/{dropId}")
-    fun getDrop(@PathVariable("dropId") dropId: UUID): DropResponse = drops.getDrop(dropId)
+    fun getDrop(@PathVariable("dropId") dropId: UUID): DropResponse = DropResponse.createWithoutStock(drops.getDrop(dropId))
 }

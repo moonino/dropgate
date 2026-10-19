@@ -13,7 +13,7 @@ import java.util.UUID
 @Service
 class DropService(private val drops: DropRepository, private val identifiers: UuidV7Generator) {
     @Transactional
-    fun createDrop(command: CreateDropCommand, adminId: UUID): DropResponse {
+    fun createDrop(command: CreateDropCommand, adminId: UUID): DropEntity {
         val drop = DropEntity(
             id = identifiers.generate(),
             name = command.name,
@@ -25,24 +25,21 @@ class DropService(private val drops: DropRepository, private val identifiers: Uu
             admissionRatePerSec = command.admissionRatePerSec,
             createdBy = adminId,
         )
-        return DropResponse.createWithoutStock(drops.save(drop))
+        return drops.save(drop)
     }
 
     @Transactional(readOnly = true)
-    fun getDrop(id: UUID): DropResponse {
-        val drop = drops.findById(id).orElseThrow { DropgateException(ErrorCode.DROP_NOT_FOUND, "드롭이 없습니다: $id") }
-        return DropResponse.createWithoutStock(drop)
-    }
+    fun getDrop(id: UUID): DropEntity = drops.findById(id).orElseThrow { DropgateException(ErrorCode.DROP_NOT_FOUND, "드롭이 없습니다: $id") }
 
     @Transactional(readOnly = true)
-    fun getFirstDrops(limit: Int): DropPageResponse = toPage(drops.findListedDrops(limit + 1), limit)
+    fun getFirstDrops(limit: Int): DropPage = toPage(drops.findListedDrops(limit + 1), limit)
 
     @Transactional(readOnly = true)
-    fun getDropsAfter(cursor: DropCursor, limit: Int): DropPageResponse = toPage(drops.findListedDropsAfter(cursor.openAt, cursor.id, limit + 1), limit)
+    fun getDropsAfter(cursor: DropCursor, limit: Int): DropPage = toPage(drops.findListedDropsAfter(cursor.openAt, cursor.id, limit + 1), limit)
 
-    private fun toPage(fetched: List<DropEntity>, limit: Int): DropPageResponse {
+    private fun toPage(fetched: List<DropEntity>, limit: Int): DropPage {
         val items = fetched.take(limit)
         val nextCursor = if (fetched.size > limit) DropCursor(items.last().openAt, items.last().id).encode() else null
-        return DropPageResponse(items.map(DropResponse::createWithoutStock), nextCursor)
+        return DropPage(items, nextCursor)
     }
 }

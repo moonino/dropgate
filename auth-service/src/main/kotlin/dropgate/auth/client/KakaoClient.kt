@@ -33,7 +33,7 @@ class KakaoClient(
         .state(state)
         .build()
 
-    fun fetchUser(code: String): KakaoUserResponse {
+    fun fetchUser(code: String): KakaoUser {
         require(code.isNotBlank()) { "카카오 인가 코드가 비어 있습니다" }
         try {
             val accessToken = requestAccessToken(code)
@@ -75,7 +75,7 @@ class KakaoClient(
             .body(JsonNode::class.java),
     )
 
-    private fun parseUser(user: JsonNode): KakaoUserResponse = KakaoUserResponse(readKakaoId(user), readNickname(user))
+    private fun parseUser(user: JsonNode): KakaoUser = KakaoUser(readKakaoId(user), readNickname(user))
 
     private fun readKakaoId(user: JsonNode): Long {
         val id = user.path("id")
@@ -98,4 +98,4 @@ class KakaoClient(
     }
 }
 
-data class KakaoUserResponse(val id: Long, val nickname: String)
+data class KakaoUser(val id: Long, val nickname: String)

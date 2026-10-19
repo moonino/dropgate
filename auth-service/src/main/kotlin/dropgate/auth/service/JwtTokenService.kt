@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.proc.SecurityContext
+import dropgate.auth.entity.UserEntity
 import dropgate.common.UuidV7Generator
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm
 import org.springframework.security.oauth2.jwt.JwsHeader
@@ -24,18 +25,18 @@ internal const val ISSUER = "dropgate-auth"
 class JwtTokenService(key: RSAKey, private val identifiers: UuidV7Generator, private val clock: Clock) {
     private val encoder = NimbusJwtEncoder(ImmutableJWKSet<SecurityContext>(JWKSet(key)))
     private val header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(key.keyID).build()
-    private val jwks = key.toPublicJWK().let {
-        JwksResponse(listOf(JwkResponse(it.keyType.value, it.keyID, it.keyUse.value, it.algorithm.name, it.modulus.toString(), it.publicExponent.toString())))
+    private val publicKeys = key.toPublicJWK().let {
+        listOf(PublicSigningKey(it.keyType.value, it.keyID, it.keyUse.value, it.algorithm.name, it.modulus.toString(), it.publicExponent.toString()))
     }
 
-    fun issueTokenPair(user: UserResponse): TokenPairResponse {
+    fun issueTokenPair(user: UserEntity): IssuedTokens {
         val issuedAt = clock.instant()
         val access = encode(user.id, issuedAt, ACCESS_TOKEN_TTL, mapOf("role" to user.role))
         val refresh = encode(user.id, issuedAt, REFRESH_TOKEN_TTL, mapOf("typ" to "refresh"))
-        return TokenPairResponse(access, refresh, ACCESS_TOKEN_TTL.seconds, "Bearer")
+        return IssuedTokens(access, refresh, ACCESS_TOKEN_TTL)
     }
 
-    fun getPublicKeys(): JwksResponse = jwks
+    fun getPublicKeys(): List<PublicSigningKey> = publicKeys
 
     private fun encode(userId: UUID, issuedAt: Instant, ttl: Duration, claims: Map<String, String>): String {
         val payload = JwtClaimsSet.builder().subject(userId.toString()).issuer(ISSUER).id(identifiers.generate().toString())
@@ -44,8 +45,6 @@ class JwtTokenService(key: RSAKey, private val identifiers: UuidV7Generator, pri
     }
 }
 
-data class TokenPairResponse(val accessToken: String, val refreshToken: String, val expiresIn: Long, val tokenType: String)
+data class IssuedTokens(val accessToken: String, val refreshToken: String, val accessTokenTtl: Duration)
 
-data class JwksResponse(val keys: List<JwkResponse>)
-
-data class JwkResponse(val kty: String, val kid: String, val use: String, val alg: String, val n: String, val e: String)
+data class PublicSigningKey(val kty: String, val kid: String, val use: String, val alg: String, val n: String, val e: String)

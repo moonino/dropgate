@@ -10,7 +10,7 @@ private val log = LoggerFactory.getLogger(PurchaseService::class.java)
 
 @Service
 class PurchaseService(private val confirmations: OrderConfirmationService, private val dropTransitions: DropStatusTransitionService) {
-    fun purchase(dropId: UUID, userId: UUID): OrderResponse {
+    fun purchase(dropId: UUID, userId: UUID): OrderWithDropName {
         val confirmed = confirmations.confirm(dropId, userId)
         if (confirmed.stockExhausted) markSoldOutKeepingOrderConfirmed(dropId)
         return confirmed.order

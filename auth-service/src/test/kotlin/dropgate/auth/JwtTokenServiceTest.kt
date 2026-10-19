@@ -2,8 +2,8 @@ package dropgate.auth
 
 import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.configuration.JwtConfiguration
+import dropgate.auth.entity.UserEntity
 import dropgate.auth.service.JwtTokenService
-import dropgate.auth.service.UserResponse
 import dropgate.common.UuidV7Generator
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -20,7 +20,7 @@ class JwtTokenServiceTest {
         val clock = Clock.fixed(issuedAt, ZoneOffset.UTC)
         val key = JwtConfiguration().jwtSigningKey(JwtIntegrationTest.privateKeyPem)
         val tokens = JwtTokenService(key, UuidV7Generator(clock, SecureRandom()), clock)
-            .issueTokenPair(UserResponse(UUID.randomUUID(), "테스터", "USER"))
+            .issueTokenPair(UserEntity(UUID.randomUUID(), 1234567, "테스터", "USER", issuedAt, issuedAt))
         listOf(tokens.accessToken, tokens.refreshToken).forEach {
             assertThat(SignedJWT.parse(it).jwtClaimsSet.issueTime.toInstant()).isEqualTo(issuedAt)
         }
