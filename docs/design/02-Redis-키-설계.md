@@ -83,7 +83,7 @@ return {stock - 1, 'OK'}
 
 meta가 없거나 status가 OPEN과 SOLD_OUT 중 하나가 아니어도 DROP_NOT_OPEN이다. SOLD_OUT도 입장, buyers, stock 검사를 이어간다. 입장 확인이 꺼져 있거나 입장 검사를 통과했으면 품절 뒤 기존 구매자는 ALREADY_PURCHASED, 신규 사용자는 SOLD_OUT이다. 입장 확인이 켜져 있고 admit 키가 없으면 buyers보다 먼저 NOT_ADMITTED다. DROP_NOT_OPEN 반환일 때만 서비스가 DB에서 드롭 존재를 확인해 없으면 404 DROP_NOT_FOUND, 있으면 409 DROP_NOT_OPEN으로 답한다.
 
-반환 첫 값이 0 이상이면 성공이고 남은 수량이다. 성공 뒤에만 DB 트랜잭션(orders INSERT, order_ledger INSERT, outbox INSERT)을 연다. INSERT 0행(UNIQUE)이면 compensate.lua 뒤 409 ALREADY_PURCHASED, DB 예외면 compensate.lua 뒤 503 ORDER_PERSIST_FAILED다. 보상 실패는 `dropgate_stock_compensation_failed_total{drop}`과 error 로그에 남기고 응답 코드는 유지한다. 대조 배치가 불일치를 잡는다.
+반환 첫 값이 0 이상이면 성공이고 남은 수량이다. 성공 뒤에만 DB 트랜잭션(orders INSERT, order_ledger INSERT, outbox INSERT)을 연다. 본문의 쓰기를 flush하고 트랜잭션 경계에서 롤백 성공이 확인된 실패만 compensate.lua로 보상한다. INSERT 0행(UNIQUE)은 보상 뒤 409 ALREADY_PURCHASED, 그 밖의 확인된 롤백은 보상 뒤 503 ORDER_PERSIST_FAILED다. 커밋 중이나 커밋 후 예외, 롤백 실패처럼 결과가 불확실하면 재고와 buyers를 유지하고 자동 보상, Lua 재실행과 상태 동기화를 하지 않는다. 이때도 503 ORDER_PERSIST_FAILED와 Retry-After 2이며 실제 주문은 확정됐을 수 있다(ADR 0021). `dropgate_order_commit_unknown_total{drop}`과 식별자를 담은 error 로그를 남기고 1회 초기화 권한 절의 수동 복구 절차로 대조한다. 보상 실패는 `dropgate_stock_compensation_failed_total{drop}`과 error 로그에 남기고 응답 코드는 유지한다. 대조 배치가 불일치를 잡는다.
 
 모든 성공 구매 확정, 성공한 compensate.lua, 성공한 cancel.lua 뒤에는 아래 DB 판매 상태 동기화를 한다. Redis 경로는 remaining_quantity를 바꾸지 않는다.
 
