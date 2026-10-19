@@ -21,4 +21,5 @@ class DropEntity(
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) val status: DropStatus,
     @Column(name = "admission_rate_per_sec", nullable = false) val admissionRatePerSec: Int,
     @Column(name = "created_by", nullable = false) val createdBy: UUID,
+    @Column(name = "stock_initialization_claimed", nullable = false) val stockInitializationClaimed: Boolean = false,
 )
