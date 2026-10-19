@@ -257,6 +257,21 @@ class KakaoLoginTest @Autowired constructor(
     }
 
     @Test
+    fun `로그아웃한 액세스로 내 정보를 다시 조회하면 401이다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        requestCurrentUser(token).expectStatus().isOk
+        logout(token).expectStatus().isNoContent
+        expectUnauthenticatedResponse(requestCurrentUser(token))
+    }
+
+    @Test
+    fun `로그아웃한 액세스로 다시 로그아웃하면 401이다`() {
+        val token = requestTokenPair()["accessToken"] as String
+        logout(token).expectStatus().isNoContent
+        expectUnauthenticatedResponse(logout(token))
+    }
+
+    @Test
     fun `인증 헤더 없이 로그아웃하면 401이다`() {
         expectUnauthenticatedResponse(http.post().uri("/auth/logout").exchange())
     }

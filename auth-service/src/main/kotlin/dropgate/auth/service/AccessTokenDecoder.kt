@@ -1,6 +1,7 @@
 package dropgate.auth.service
 
 import com.nimbusds.jose.jwk.RSAKey
+import dropgate.common.authentication.RevokedAccessTokens
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator
@@ -18,7 +19,7 @@ import java.util.UUID
 private val BEARER_HEADER = Regex("Bearer +([^\\s]+)", RegexOption.IGNORE_CASE)
 
 @Service
-class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
+class AccessTokenDecoder(key: RSAKey, private val clock: Clock, private val revokedAccessTokens: RevokedAccessTokens) {
     private val decoder = NimbusJwtDecoder.withPublicKey(key.toRSAPublicKey()).signatureAlgorithm(SignatureAlgorithm.RS256).build().apply {
         setJwtValidator(
             DelegatingOAuth2TokenValidator(
@@ -44,6 +45,7 @@ class AccessTokenDecoder(key: RSAKey, private val clock: Clock) {
             require(userId.toString().equals(subject, ignoreCase = true)) { "sub가 표준 UUID 형식이 아닙니다" }
             val tokenId = requireNotNull(jwt.id) { "토큰에 식별자 jti가 없습니다" }
             require(tokenId.isNotBlank()) { "토큰의 식별자 jti가 비어 있습니다" }
+            if (revokedAccessTokens.isRevoked(tokenId)) throw DropgateException(ErrorCode.UNAUTHENTICATED, "액세스 토큰 $tokenId 는 무효화됐습니다")
             VerifiedAccessToken(userId, tokenId, expiresAt)
         } catch (exception: JwtException) {
             throw DropgateException(ErrorCode.UNAUTHENTICATED, "액세스 토큰 검증 실패: ${exception.message}", cause = exception)
