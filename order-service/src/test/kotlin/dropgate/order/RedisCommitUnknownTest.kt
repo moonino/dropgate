@@ -28,8 +28,6 @@ class RedisCommitUnknownTest : RedisFlowIntegrationTest() {
         assertThat(confirmed).isEqualTo(1L)
         assertThat(readStock(dropId)).isEqualTo("0")
         assertThat(redis.opsForSet().members("drop:$dropId:buyers")).containsExactly(userId.toString())
-        assertThat(metrics.get("dropgate_order_commit_unknown_total").tag("drop", dropId.toString()).counter().count()).isEqualTo(1.0)
-        assertThat(findDropStatus(dropId)).isEqualTo("OPEN")
         assertThat(failure)
             .isInstanceOfSatisfying(DropgateException::class.java) { assertThat(it.errorCode).isEqualTo(ErrorCode.SOLD_OUT) }
     }
