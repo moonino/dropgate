@@ -1,5 +1,7 @@
 package dropgate.order.event
 
+import dropgate.order.UTC_JSON_TIMEZONE
+import dropgate.order.UTC_MILLIS_JSON_PATTERN
 import dropgate.order.entity.OutboxEntity
 import org.springframework.data.redis.connection.RedisStreamCommands.TrimOptions
 import org.springframework.data.redis.connection.RedisStreamCommands.XAddOptions
@@ -7,11 +9,12 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 import java.time.Instant
-import java.time.format.DateTimeFormatterBuilder
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private const val ORDER_EVENT_STREAM = "orders.events"
 private const val MAX_STREAM_LENGTH = 1_000_000L
-private val EVENT_TIME_FORMAT = DateTimeFormatterBuilder().appendInstant(3).toFormatter()
+private val EVENT_TIME_FORMAT = DateTimeFormatter.ofPattern(UTC_MILLIS_JSON_PATTERN).withZone(ZoneId.of(UTC_JSON_TIMEZONE))
 
 @Component
 class OrderEventStream(private val redis: StringRedisTemplate, private val jsonMapper: ObjectMapper) {
@@ -35,8 +38,8 @@ class OrderEventStream(private val redis: StringRedisTemplate, private val jsonM
 
     private fun readOccurredAt(event: OutboxEntity): Instant {
         val field = when (event.eventType) {
-            "order.confirmed" -> "confirmedAt"
-            "order.canceled" -> "canceledAt"
+            ORDER_CONFIRMED_EVENT -> "confirmedAt"
+            ORDER_CANCELED_EVENT -> "canceledAt"
             else -> throw IllegalArgumentException("발생 시각을 읽을 수 없는 주문 이벤트입니다: ${event.id} ${event.eventType}")
         }
         return Instant.parse(jsonMapper.readTree(event.payload).path(field).stringValue(""))

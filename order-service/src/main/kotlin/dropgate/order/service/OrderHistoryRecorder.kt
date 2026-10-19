@@ -4,6 +4,8 @@ import dropgate.order.entity.LedgerEntryType
 import dropgate.order.entity.OrderEntity
 import dropgate.order.entity.OrderLedgerEntity
 import dropgate.order.entity.OutboxEntity
+import dropgate.order.event.ORDER_CANCELED_EVENT
+import dropgate.order.event.ORDER_CONFIRMED_EVENT
 import dropgate.order.repository.OrderLedgerRepository
 import dropgate.order.repository.OutboxRepository
 import org.springframework.stereotype.Component
@@ -11,8 +13,6 @@ import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 
 private const val ORDER_AGGREGATE_TYPE = "order"
-private const val ORDER_CONFIRMED_EVENT = "order.confirmed"
-private const val ORDER_CANCELED_EVENT = "order.canceled"
 
 @Component
 class OrderHistoryRecorder(private val ledger: OrderLedgerRepository, private val outbox: OutboxRepository, private val jsonMapper: ObjectMapper) {
