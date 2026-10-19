@@ -2,7 +2,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 날짜, 도구 | 2026-10-19, Claude Code 자동 리뷰 제안 |
+| 날짜, 도구 | 2026-10-19, Claude Code 자동 리뷰 제안(요약 댓글의 제안) |
 | 제안 요지 | unavailable도 담기는 firstPage를 result나 orders로 바꿔 결과 래퍼임을 드러낸다. |
 | 왜 틀렸나 | 과잉. 결과 래퍼를 드러내는 이름 개선은 가능하지만 첫 페이지 조회 결과라는 범위는 함수와 사용 지점에 드러난다. kind 분기 후 body를 OrderList에 전달하는 현재 코드에는 결과 판정의 결함이 없어 세션 복구를 연결한 이번 범위에서 미룬다. |
 | 어떻게 알았나 | 문서 대조. [후속 리뷰](https://github.com/moonino/dropgate/pull/143#issuecomment-6261257065)를 66d20aa의 주문 화면 조회와 kind 분기에 대조했다. unavailable은 안내로 반환하고 성공한 결과의 body만 OrderList에 전달한다. |
