@@ -12,6 +12,9 @@ import java.util.Optional
 import java.util.UUID
 
 interface OrderRepository : JpaRepository<OrderEntity, UUID> {
+    @Query(value = "SELECT count(*) FROM orders.orders WHERE drop_id = :dropId AND status = 'CONFIRMED'", nativeQuery = true)
+    fun countConfirmedByDropId(@Param("dropId") dropId: UUID): Long
+
     @Modifying
     @Query(
         value = """
