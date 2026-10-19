@@ -10,6 +10,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  data:
+    redis:
+      host: ${DROPGATE_REDIS_HOST}
+      port: ${DROPGATE_REDIS_PORT}
+      timeout: 200ms
+      connect-timeout: 1s
 
 server:
   port: 8081

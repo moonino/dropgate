@@ -11,9 +11,19 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
 import dropgate.auth.configuration.JwtConfiguration
+import dropgate.auth.controller.KakaoCallbackController
 import dropgate.auth.repository.OAuthStateCookieRepository
+import dropgate.auth.repository.RefreshTokenRepository
+import dropgate.auth.service.JwtTokenService
+import dropgate.auth.service.UserService
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.GlobalExceptionHandler
 import dropgate.common.error.assertThrowsDropgateError
+import io.lettuce.core.ClientOptions.DisconnectedBehavior
+import io.lettuce.core.codec.StringCodec
+import io.lettuce.core.output.ValueOutput
+import io.lettuce.core.protocol.Command
+import io.lettuce.core.protocol.CommandType
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
@@ -25,6 +35,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.mock.web.MockHttpServletRequest
@@ -32,7 +45,9 @@ import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.client.RestTestClient
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.util.UriComponentsBuilder
+import java.net.ServerSocket
 import java.net.SocketTimeoutException
 import java.security.SecureRandom
 import java.time.Clock
@@ -44,14 +59,71 @@ import java.util.concurrent.Executors
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureRestTestClient
-@Import(PostgresTestcontainersConfiguration::class)
-class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, private val kakao: KakaoClient, private val jdbc: JdbcClient) : JwtIntegrationTest() {
+@Import(PostgresTestcontainersConfiguration::class, RedisTestcontainersConfiguration::class)
+class KakaoLoginTest @Autowired constructor(
+    private val http: RestTestClient,
+    private val kakao: KakaoClient,
+    private val jdbc: JdbcClient,
+    private val redis: StringRedisTemplate,
+    private val connectionFactory: LettuceConnectionFactory,
+    private val users: UserService,
+    private val tokens: JwtTokenService,
+) : JwtIntegrationTest() {
     private val cookies = OAuthStateCookieRepository(kakao, "test-cookie-signing-key-32-bytes-long", Clock.systemUTC(), SecureRandom())
 
     @BeforeEach
     fun resetKakao() {
         wiremock.resetAll()
         jdbc.sql("DELETE FROM auth.users").update()
+        redis.connectionFactory!!.connection.use { it.serverCommands().flushDb() }
+    }
+
+    @Test
+    fun `콜백은 리프레시를 14일 안의 TTL로 저장한다`() {
+        val claims = SignedJWT.parse(requestTokenPair()["refreshToken"] as String).jwtClaimsSet
+        val key = "auth:refresh:${claims.subject}:${claims.jwtid}"
+        assertThat(redis.opsForValue().get(key)).isEqualTo("1")
+        assertThat(redis.getExpire(key)).isBetween(1L, Duration.ofDays(14).seconds)
+    }
+
+    @Test
+    fun `콜백은 사용자 리프레시 index에 발급 식별자를 기록한다`() {
+        val claims = SignedJWT.parse(requestTokenPair()["refreshToken"] as String).jwtClaimsSet
+        assertThat(redis.opsForSet().members("auth:refresh-index:${claims.subject}")).containsExactly(claims.jwtid)
+    }
+
+    @Test
+    fun `실제 Redis 연결은 reconnect를 유지하고 Lua replay와 단절 중 명령을 막는다`() {
+        val options = connectionFactory.clientConfiguration.clientOptions.orElseThrow()
+        val command = Command<String, String, String>(CommandType.EVAL, ValueOutput(StringCodec.UTF8))
+        assertThat(options.isAutoReconnect).isTrue()
+        assertThat(options.replayFilter.test(command)).isTrue()
+        assertThat(options.disconnectedBehavior).isEqualTo(DisconnectedBehavior.REJECT_COMMANDS)
+    }
+
+    @Test
+    fun `실제 Redis 연결은 Boot 명령과 연결 타임아웃을 유지한다`() {
+        val configuration = connectionFactory.clientConfiguration
+        val options = configuration.clientOptions.orElseThrow()
+        assertThat(configuration.commandTimeout).isEqualTo(Duration.ofMillis(200))
+        assertThat(options.socketOptions.connectTimeout).isEqualTo(Duration.ofSeconds(1))
+        assertThat(options.timeoutOptions.isTimeoutCommands).isTrue()
+    }
+
+    @Test
+    fun `콜백의 Redis 연결 거절은 AUTH_UNAVAILABLE과 재시도 헤더를 돌려준다`() {
+        val port = ServerSocket(0).use { it.localPort }
+        val unavailable = LettuceConnectionFactory(RedisStandaloneConfiguration("127.0.0.1", port), connectionFactory.clientConfiguration)
+        unavailable.afterPropertiesSet()
+        try {
+            val callback = KakaoCallbackController(cookies, kakao, users, tokens, RefreshTokenRepository(StringRedisTemplate(unavailable)))
+            val client = RestTestClient.bindTo(MockMvcBuilders.standaloneSetup(callback).setControllerAdvice(GlobalExceptionHandler()).build()).build()
+            stubKakaoUser("""{"id":1234567}""")
+            callCallback(client = client).expectStatus().isEqualTo(503).expectHeader().valueEquals("Retry-After", "2")
+                .expectBody().jsonPath("$.code").isEqualTo("AUTH_UNAVAILABLE")
+        } finally {
+            unavailable.destroy()
+        }
     }
 
     @Test
@@ -365,11 +437,11 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     private fun requestJwks(): List<Map<String, Any>> = http.get().uri("/.well-known/jwks.json").exchange().expectStatus().isOk
         .expectBody(JwksTestResponse::class.java).returnResult().responseBody!!.keys
 
-    private fun callCallback(code: String = "code"): RestTestClient.ResponseSpec {
+    private fun callCallback(code: String = "code", client: RestTestClient = http): RestTestClient.ResponseSpec {
         val headers = requestLogin()
         val state = UriComponentsBuilder.fromUriString(headers.location.toString())
             .build().queryParams.getFirst("state")!!
-        return http.get()
+        return client.get()
             .uri("/auth/callback/kakao?code=$code&state=$state")
             .cookie("dropgate_oauth_state", readStateCookie(headers))
             .exchange()

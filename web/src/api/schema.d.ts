@@ -122,6 +122,7 @@ export interface paths {
                         "application/json": components["schemas"]["TokenPair"];
                     };
                 };
+                400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
                 503: components["responses"]["Unavailable"];
             };

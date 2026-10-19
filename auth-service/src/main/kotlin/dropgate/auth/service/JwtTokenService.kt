@@ -31,20 +31,21 @@ class JwtTokenService(key: RSAKey, private val identifiers: UuidV7Generator, pri
 
     fun issueTokenPair(user: UserEntity): IssuedTokens {
         val issuedAt = clock.instant()
-        val access = encode(user.id, issuedAt, ACCESS_TOKEN_TTL, mapOf("role" to user.role))
-        val refresh = encode(user.id, issuedAt, REFRESH_TOKEN_TTL, mapOf("typ" to "refresh"))
-        return IssuedTokens(access, refresh, ACCESS_TOKEN_TTL)
+        val access = encode(user.id, issuedAt, ACCESS_TOKEN_TTL, mapOf("role" to user.role), identifiers.generate())
+        val refreshTokenId = identifiers.generate()
+        val refresh = encode(user.id, issuedAt, REFRESH_TOKEN_TTL, mapOf("typ" to "refresh"), refreshTokenId)
+        return IssuedTokens(access, refresh, ACCESS_TOKEN_TTL, refreshTokenId, REFRESH_TOKEN_TTL)
     }
 
     fun getPublicKeys(): List<PublicSigningKey> = publicKeys
 
-    private fun encode(userId: UUID, issuedAt: Instant, ttl: Duration, claims: Map<String, String>): String {
-        val payload = JwtClaimsSet.builder().subject(userId.toString()).issuer(ISSUER).id(identifiers.generate().toString())
+    private fun encode(userId: UUID, issuedAt: Instant, ttl: Duration, claims: Map<String, String>, tokenId: UUID): String {
+        val payload = JwtClaimsSet.builder().subject(userId.toString()).issuer(ISSUER).id(tokenId.toString())
             .issuedAt(issuedAt).expiresAt(issuedAt.plus(ttl)).claims { it.putAll(claims) }.build()
         return encoder.encode(JwtEncoderParameters.from(header, payload)).tokenValue
     }
 }
 
-data class IssuedTokens(val accessToken: String, val refreshToken: String, val accessTokenTtl: Duration)
+data class IssuedTokens(val accessToken: String, val refreshToken: String, val accessTokenTtl: Duration, val refreshTokenId: UUID, val refreshTokenTtl: Duration)
 
 data class PublicSigningKey(val kty: String, val kid: String, val use: String, val alg: String, val n: String, val e: String)
