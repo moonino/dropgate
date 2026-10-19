@@ -47,7 +47,7 @@
 | 404 | DROP_NOT_FOUND | 드롭 | |
 | 404 | ORDER_NOT_FOUND | 주문 | |
 | 404 | JOB_EXECUTION_NOT_FOUND | 배치 | |
-| 409 | DROP_NOT_OPEN | 대기열, 구매 | SCHEDULED, CLOSED, Redis 초기화 전 또는 마감 시각 이후 |
+| 409 | DROP_NOT_OPEN | 대기열, 구매 | SCHEDULED, CLOSED. Redis 경로는 초기화 전 또는 마감 시각 이후도 포함 |
 | 409 | SOLD_OUT | 대기열, 구매 | |
 | 409 | ALREADY_PURCHASED | 대기열, 구매 | 취소한 사용자도 포함. Lua 성공 뒤 orders INSERT 0행도 보상 후 이 코드 |
 | 409 | ORDER_ALREADY_CANCELED | 취소 | |
