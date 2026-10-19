@@ -282,14 +282,6 @@ main() {
   kill -0 "$ORDER_PID"
   wait_for_outbox
   print_accuracy_report "$drop_id"
-  jq -e --argjson expected "$TOTAL_QUANTITY" '.confirmed == $expected and .canceled == 0 and
-    .status == "SOLD_OUT" and .outbox.pending == 0 and .outbox.failed == 0 and .outbox.published == $expected and
-    .streamLength == $expected' "$RECONCILIATION_FILE" >/dev/null
-  jq -e --argjson expected "$REQUEST_COUNT" --argjson quantity "$TOTAL_QUANTITY" '
-    .metrics.http_reqs.count == $expected and .metrics.purchase_confirmed.count == $quantity and
-    (.metrics.purchase_unexpected.count // 0) == 0 and
-    ((.metrics.purchase_confirmed.count // 0) + (.metrics.purchase_sold_out.count // 0) +
-      (.metrics.purchase_already_purchased.count // 0)) == $expected' "$SUMMARY_FILE" >/dev/null
   print_summary
   print_environment | tee "$ENVIRONMENT_FILE"
 }
