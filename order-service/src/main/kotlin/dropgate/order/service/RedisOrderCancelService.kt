@@ -6,6 +6,7 @@ import dropgate.order.entity.OrderStatus
 import dropgate.order.repository.DropRepository
 import dropgate.order.repository.OrderRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation.REQUIRES_NEW
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.temporal.ChronoUnit
@@ -18,7 +19,7 @@ class RedisOrderCancelService(
     private val history: OrderHistoryRecorder,
     private val clock: Clock,
 ) {
-    @Transactional
+    @Transactional(propagation = REQUIRES_NEW)
     fun cancel(orderId: UUID, userId: UUID): OrderWithDropName {
         val order = orders.findForUpdate(orderId).orElseThrow { DropgateException(ErrorCode.ORDER_NOT_FOUND, "주문이 없습니다: $orderId") }
         if (order.userId != userId) throw DropgateException(ErrorCode.FORBIDDEN, "사용자 $userId 는 남의 주문 $orderId 를 취소할 수 없습니다")
