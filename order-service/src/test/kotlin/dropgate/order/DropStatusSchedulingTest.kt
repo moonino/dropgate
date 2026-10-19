@@ -1,6 +1,7 @@
 package dropgate.order
 
 import dropgate.order.service.DropStatusTransitionScheduler
+import dropgate.order.service.OutboxRelayScheduler
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -19,5 +20,6 @@ class DropStatusSchedulingTest {
         val tasks = taskHolders.flatMap { it.scheduledTasks }.map { it.task.runnable.toString() }
 
         assertThat(tasks).anyMatch { it.contains(DropStatusTransitionScheduler::class.java.name) }
+        assertThat(tasks).noneMatch { it.contains(OutboxRelayScheduler::class.java.name) }
     }
 }

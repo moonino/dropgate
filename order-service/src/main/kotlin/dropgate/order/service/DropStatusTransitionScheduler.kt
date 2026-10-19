@@ -3,6 +3,7 @@ package dropgate.order.service
 import dropgate.common.error.DropgateException
 import dropgate.order.repository.DropStockRepository
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock
@@ -12,6 +13,7 @@ private const val TRANSITION_INTERVAL_SECONDS = 1L
 private val log = LoggerFactory.getLogger(DropStatusTransitionScheduler::class.java)
 
 @Component
+@ConditionalOnBooleanProperty("dropgate.drops.status-scheduler.enabled", matchIfMissing = true)
 class DropStatusTransitionScheduler(
     private val transitions: DropStatusTransitionService,
     private val initializations: DropStockInitializationService,
