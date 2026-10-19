@@ -1,6 +1,8 @@
 package dropgate.common.error
 
 import org.springframework.context.MessageSourceResolvable
+import org.springframework.core.MethodParameter
+import org.springframework.core.annotation.AnnotatedElementUtils
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.validation.FieldError
@@ -8,6 +10,8 @@ import org.springframework.validation.method.ParameterValidationResult
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
@@ -43,8 +47,16 @@ class GlobalExceptionHandler {
         .ifEmpty { BODY_FIELD }
 
     private fun ParameterValidationResult.toFieldErrorResponses(): List<FieldErrorResponse> {
-        val parameterName = methodParameter.parameterName ?: "arg${methodParameter.parameterIndex}"
-        return resolvableErrors.map { FieldErrorResponse(it.readFieldOr(parameterName), it.defaultMessage.orEmpty()) }
+        val requestName = methodParameter.readRequestName()
+        return resolvableErrors.map { FieldErrorResponse(it.readFieldOr(requestName), it.defaultMessage.orEmpty()) }
+    }
+
+    private fun MethodParameter.readRequestName(): String {
+        val requestParam = AnnotatedElementUtils.getMergedAnnotation(parameter, RequestParam::class.java)
+        val pathVariable = AnnotatedElementUtils.getMergedAnnotation(parameter, PathVariable::class.java)
+        return sequenceOf(requestParam?.name, pathVariable?.name, parameterName)
+            .filterNotNull()
+            .firstOrNull(String::isNotEmpty) ?: "arg$parameterIndex"
     }
 
     private fun MessageSourceResolvable.readFieldOr(fallback: String): String = if (this is FieldError) field else fallback
