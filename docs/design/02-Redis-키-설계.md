@@ -4,6 +4,8 @@ Redis 하나(논리 DB 0)를 세 서비스가 쓴다. 키 앞머리로 소유 �
 
 Sentinel 마스터 이름 `dropgate-master`. 클라이언트는 Lettuce Sentinel 모드. 명령 타임아웃 200ms, 연결 타임아웃 1초. 쓰기는 마스터로만, 읽기도 마스터로(정합성 우선, 복제 지연 회피).
 
+auth와 order의 공통 클라이언트 경계: Boot의 `LettuceClientOptionsBuilderCustomizer` 빈에서 Lettuce의 autoReconnect를 유지하고 replayFilter는 모든 명령에 true를 반환하며 disconnectedBehavior는 REJECT_COMMANDS로 둔다. 기존 소켓 연결 1초와 TimeoutOptions 설정을 보존한다. 앱에서도 Lua를 재시도하지 않는다. 통신 실패는 실행 여부가 불확실하므로 기존 판매 차단, 대조와 수동 복구 원칙을 따른다. 초기화나 INCR 보상을 재전송해 1회 권한과 수량을 깨뜨리지 않기 위한 설정이다. 근거는 [명령 실행 신뢰성](https://redis.github.io/lettuce/advanced-usage/command-execution-reliability/)과 [ClientOptions](https://redis.github.io/lettuce/advanced-usage/client-options/)다. 프로젝트 BOM이 해석한 Lettuce 7.5.2.RELEASE의 [DefaultEndpoint](https://raw.githubusercontent.com/redis/lettuce/7.5.2.RELEASE/src/main/java/io/lettuce/core/protocol/DefaultEndpoint.java)에서 연결 단절 시 pending과 endpoint 큐를 예외로 종료하는 경계를 확인했다. 후속 구현의 실제 단절 테스트로 고정한다.
+
 ## 1. auth-service
 
 | 키 | 자료형 | 값 | TTL | 뜻 |
@@ -33,13 +35,13 @@ Sentinel 마스터 이름 `dropgate-master`. 클라이언트는 Lettuce Sentinel
 
 ### OPEN 초기화 (init.lua)
 
-드롭 상태 스케줄러는 매 틱 DB 상태 전이 뒤 OPEN 드롭의 초기화 권한을 요청한다. 별도 DB 트랜잭션으로 `UPDATE drops SET stock_initialization_claimed=true WHERE id=? AND status='OPEN' AND stock_initialization_claimed=false`를 커밋하고, 영향 행이 1인 호출만 init.lua를 실행한다. claim은 Redis와 분리해 영속 저장하므로 여러 파드가 초기화해도 권한은 한 번뿐이다.
+드롭 상태 스케줄러는 매 틱 DB 상태 전이 뒤 OPEN 드롭의 초기화 권한을 요청한다. 별도 DB 트랜잭션으로 `UPDATE drops SET stock_initialization_claimed=true WHERE id=? AND status='OPEN' AND stock_initialization_claimed=false`를 커밋하고, 영향 행이 1인 호출만 init.lua를 실행한다. claim은 Redis와 분리해 영속 저장하므로 여러 파드가 초기화해도 권한은 한 번뿐이다. 새 마이그레이션에서 기존 드롭은 claim=true로 backfill하고 이후 새 드롭의 기본값만 false로 둔다. 기존 드롭의 Redis 전환은 수동 복구 대상이다.
 
 init.lua의 KEYS는 stock, meta이고 ARGV는 total_quantity, open_at ms, close_at ms, rate다. meta가 있으면 아무것도 하지 않고 0을 돌려준다. 없으면 meta를 HSET(status OPEN, open_at, close_at, rate), stock을 SET NX total_quantity 하고 두 키를 PEXPIREAT close_at + 7일로 맞춘 뒤 1을 돌려준다.
 
-최초 초기화 실패도 실행 여부를 확신할 수 없으므로 claim을 유지하고 경고 로그를 남긴다. 다음 틱에 자동 재시도하지 않고 판매를 차단해 수동 복구한다. claim=true 드롭의 Redis 키가 유실돼도 자동 재생성하지 않는다. 초기화 전이나 meta 유실 뒤 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 같은 초기화 절차를 쓴다(ADR 0005).
+최초 초기화 실패도 실행 여부를 확신할 수 없으므로 claim을 유지하고 경고 로그를 남긴다. 다음 틱에 자동 재시도하지 않는다. 키가 없으면 판매를 차단해 수동 복구하고, 응답만 유실돼 이미 성공한 키가 있으면 기존 구매 계약대로 사용한다. claim=true 드롭의 Redis 키가 유실돼도 자동 재생성하지 않는다. 초기화 전이나 meta 유실 뒤 구매는 DROP_NOT_OPEN이다. `purchase-path=db`여도 같은 초기화 절차를 쓴다(ADR 0005).
 
-수동 복구는 모든 주문 인스턴스를 중지하고 진행 중 DB 트랜잭션 종료를 확인한 뒤 한다. CONFIRMED 주문 수로 stock을 total_quantity에서 그 수를 뺀 값으로, buyers를 해당 사용자 집합으로 복원하고 meta의 상태와 시각, rate 및 각 키의 TTL을 맞춘 뒤 재개한다. claim은 true로 유지한다. DB 건수만 보고 자동 초기화를 허용하지 않는다. 진행 중 주문이 아직 집계되지 않을 수 있어 가용성보다 초과 판매 방지를 택한다.
+수동 복구는 모든 주문 인스턴스를 중지하고 진행 중 DB 트랜잭션 종료와 기존 Redis 클라이언트 연결 및 미처리 쓰기 제거를 확인한 뒤 한다. CONFIRMED 주문 수로 stock을 total_quantity에서 그 수를 뺀 값으로, buyers를 해당 사용자 집합으로 복원하고 meta의 상태와 시각, rate 및 각 키의 TTL을 맞춘 뒤 재개한다. claim은 true로 유지한다. DB 건수만 보고 자동 초기화를 허용하지 않는다. 진행 중 주문이 아직 집계되지 않을 수 있어 가용성보다 초과 판매 방지를 택한다.
 
 드롭 단건의 remainingQuantity는 stock GET, 목록은 페이지 항목의 stock을 MGET 한 번으로 읽는다. 키 없음(SCHEDULED, 초기화 전), Redis 실패, 200ms 초과면 해당 수량만 null이고 HTTP 200을 유지한다. DB 경로의 stock은 판매 때 줄지 않아 total_quantity에 머문다(ADR 0005).
 

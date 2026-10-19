@@ -33,6 +33,7 @@
 - 오류 응답은 `{code, message, errors[]}` 하나. message는 사용자에게 그대로 보여 줄 한국어 문장이고 클라이언트는 code로 분기한다(미터엔진 MS2-332 결정과 같다)
 - 503에는 Retry-After 초를 붙인다
 - Bearer 검증은 common 모듈 필터 하나. JWKS 10분 캐시, 무효화 목록은 요청마다 Redis 확인. 그래서 Bearer 엔드포인트는 전부 503 AUTH_UNAVAILABLE을 낼 수 있다
+- auth와 order의 Redis 접속과 재시도는 02 문서 머리의 공통 클라이언트 경계를 따른다. 통신 실패를 실행되지 않았다는 뜻으로 해석하지 않는다
 - openapi.yaml은 `npx @redocly/cli lint docs/design/openapi.yaml`이 통과해야 한다. 규칙은 루트 `redocly.yaml`
 
 ## 오류 코드표
