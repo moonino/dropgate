@@ -40,7 +40,7 @@ class StockTimeoutResponseTest : OrderApiIntegrationTest() {
                     .expectHeader().valueEquals("Retry-After", "2")
                     .expectBody().jsonPath("$.code").isEqualTo("STOCK_UNAVAILABLE")
             }
-            println("재고 구매 HTTP 응답 시간: $elapsed, 명령 제한: ${isolated.connections.clientConfiguration.commandTimeout}")
+            println("재고 구매 HTTP 응답 시간: $elapsed, 명령 제한: ${isolated.stockConnections.clientConfiguration.commandTimeout}")
             assertThat(elapsed.inWholeMilliseconds).isBetween(150L, 2000L)
         } finally {
             docker.unpauseContainerCmd(isolated.container.containerId).exec()
@@ -48,20 +48,20 @@ class StockTimeoutResponseTest : OrderApiIntegrationTest() {
     }
 
     @TestConfiguration(proxyBeanMethods = false)
-    class UnresponsiveStocks(connections: LettuceConnectionFactory) : DisposableBean {
+    class UnresponsiveStocks(shared: LettuceConnectionFactory) : DisposableBean {
         val container: GenericContainer<*> = GenericContainer<Nothing>("redis:7.4-alpine").withExposedPorts(STOCK_REDIS_PORT).apply { start() }
-        val connections = LettuceConnectionFactory(
+        val stockConnections = LettuceConnectionFactory(
             RedisStandaloneConfiguration(container.host, container.getMappedPort(STOCK_REDIS_PORT)),
-            connections.clientConfiguration,
+            shared.clientConfiguration,
         ).apply { afterPropertiesSet() }
-        val redis = StringRedisTemplate(this.connections)
+        val redis = StringRedisTemplate(stockConnections)
 
         @Bean
         @Primary
         fun unresponsiveStocks(settings: OrderProperties): DropStockRepository = DropStockRepository(redis, settings)
 
         override fun destroy() {
-            connections.destroy()
+            stockConnections.destroy()
             container.stop()
         }
     }

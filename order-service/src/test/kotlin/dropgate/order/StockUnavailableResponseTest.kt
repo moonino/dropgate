@@ -26,10 +26,10 @@ class StockUnavailableResponseTest : OrderApiIntegrationTest() {
     }
 
     @TestConfiguration(proxyBeanMethods = false)
-    class UnavailableStocks(connections: LettuceConnectionFactory) : DisposableBean {
+    class UnavailableStocks(shared: LettuceConnectionFactory) : DisposableBean {
         private val unavailable = LettuceConnectionFactory(
             RedisStandaloneConfiguration("127.0.0.1", ServerSocket(0).use { it.localPort }),
-            connections.clientConfiguration,
+            shared.clientConfiguration,
         ).apply { afterPropertiesSet() }
 
         @Bean
