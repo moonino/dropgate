@@ -6,15 +6,21 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.TransactionException
 import java.util.UUID
 
-private val log = LoggerFactory.getLogger(PurchaseService::class.java)
+private val log = LoggerFactory.getLogger(DbPurchaseFlow::class.java)
 
 @Service
-class PurchaseService(private val confirmations: OrderConfirmationService, private val dropTransitions: DropStatusTransitionService) {
-    fun purchase(dropId: UUID, userId: UUID): OrderWithDropName {
+class DbPurchaseFlow(
+    private val confirmations: DbOrderConfirmationService,
+    private val cancellations: DbOrderCancelService,
+    private val dropTransitions: DropStatusTransitionService,
+) : PurchaseFlow {
+    override fun purchase(dropId: UUID, userId: UUID): OrderWithDropName {
         val confirmed = confirmations.confirm(dropId, userId)
         if (confirmed.stockExhausted) markSoldOutKeepingOrderConfirmed(dropId)
         return confirmed.order
     }
+
+    override fun cancel(orderId: UUID, userId: UUID): OrderWithDropName = cancellations.cancel(orderId, userId)
 
     private fun markSoldOutKeepingOrderConfirmed(dropId: UUID) {
         try {
