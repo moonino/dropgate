@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { Drop } from "@/api/types";
 import { BuyPanel } from "@/components/BuyPanel";
+import { ConsumeRefreshMarker } from "@/components/ConsumeRefreshMarker";
 import { Countdown } from "@/components/Countdown";
 import { SaleOpenAnnouncement } from "@/components/SaleOpenAnnouncement";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -35,6 +36,7 @@ export default async function DropDetailPage({ params }: DropPageProps) {
   const target = decideCountdownTarget(drop);
   return (
     <main className="page" style={{ paddingTop: 32 }}>
+      {viewer.kind === "signed-in" && <ConsumeRefreshMarker />}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <StatusBadge badge={DROP_STATUS_BADGES[drop.status]} />
         <h1 className="page-title__heading" style={{ fontSize: "clamp(34px, 6vw, 52px)" }}>
