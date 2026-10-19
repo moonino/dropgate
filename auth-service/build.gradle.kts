@@ -10,6 +10,7 @@ dependencies {
     implementation(libs.spring.security.oauth2.client)
     implementation(libs.spring.security.oauth2.jose)
     runtimeOnly(libs.postgresql)
+    testImplementation(testFixtures(project(":common")))
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.wiremock)

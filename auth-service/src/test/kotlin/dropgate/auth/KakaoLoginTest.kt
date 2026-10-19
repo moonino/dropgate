@@ -12,11 +12,10 @@ import com.nimbusds.jwt.SignedJWT
 import dropgate.auth.client.KakaoClient
 import dropgate.auth.configuration.JwtConfiguration
 import dropgate.auth.repository.OAuthStateCookieRepository
-import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.assertThrowsDropgateError
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -86,9 +85,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             "위변조" -> callback.cookies!!.single().value += "tampered"
             "누락" -> callback.setCookies()
         }
-        assertThatThrownBy { cookies.loadAuthorizationRequest(callback) }.isInstanceOfSatisfying(DropgateException::class.java) {
-            assertThat(it.errorCode).isEqualTo(ErrorCode.VALIDATION_FAILED)
-        }
+        assertThrowsDropgateError(ErrorCode.VALIDATION_FAILED) { cookies.loadAuthorizationRequest(callback) }
     }
 
     @Test
@@ -111,9 +108,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             .withHeader("Content-Type", "application/json")
             .withFixedDelay(if (status == 200) 3500 else 0)
         wiremock.stubFor(WireMock.post("/oauth/token").willReturn(tokenResponse))
-        val failure = assertThatThrownBy { kakao.fetchUser("code") }.isInstanceOfSatisfying(DropgateException::class.java) {
-            assertThat(it.errorCode).isEqualTo(ErrorCode.KAKAO_UNAVAILABLE)
-        }
+        val failure = assertThrowsDropgateError(ErrorCode.KAKAO_UNAVAILABLE) { kakao.fetchUser("code") }
         if (status == 200) failure.hasRootCauseInstanceOf(SocketTimeoutException::class.java)
     }
 
@@ -188,24 +183,24 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
 
     @Test
     fun `내 정보는 인증 헤더가 없으면 401을 돌려준다`() {
-        assertUnauthenticated(http.get().uri("/auth/me").exchange())
+        expectUnauthenticatedResponse(http.get().uri("/auth/me").exchange())
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["Bearer", "Basic token", "Bearer invalid.jwt.token", "Bearer token extra"])
     fun `내 정보는 잘못된 인증 헤더나 토큰이면 401을 돌려준다`(header: String) {
-        assertUnauthenticated(http.get().uri("/auth/me").header(HttpHeaders.AUTHORIZATION, header).exchange())
+        expectUnauthenticatedResponse(http.get().uri("/auth/me").header(HttpHeaders.AUTHORIZATION, header).exchange())
     }
 
     @Test
     fun `내 정보는 다른 키로 서명한 토큰이면 401을 돌려준다`() {
         val otherKey = JwtConfiguration().jwtSigningKey(generatePrivateKeyPem())
-        assertUnauthenticated(requestCurrentUser(signAccessToken(otherKey)))
+        expectUnauthenticatedResponse(requestCurrentUser(signAccessToken(otherKey)))
     }
 
     @Test
     fun `내 정보는 RS256 이외의 알고리즘이면 401을 돌려준다`() {
-        assertUnauthenticated(requestCurrentUser(signAccessToken(algorithm = JWSAlgorithm.RS512)))
+        expectUnauthenticatedResponse(requestCurrentUser(signAccessToken(algorithm = JWSAlgorithm.RS512)))
     }
 
     @Test
@@ -214,35 +209,35 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
             issueTime(Date.from(Instant.now().minus(Duration.ofMinutes(15))))
             expirationTime(Date.from(Instant.now().minusSeconds(1)))
         }
-        assertUnauthenticated(requestCurrentUser(expired))
+        expectUnauthenticatedResponse(requestCurrentUser(expired))
     }
 
     @Test
     fun `내 정보는 다른 발급자의 토큰이면 401을 돌려준다`() {
-        assertUnauthenticated(requestCurrentUser(signAccessToken { issuer("other-auth") }))
+        expectUnauthenticatedResponse(requestCurrentUser(signAccessToken { issuer("other-auth") }))
     }
 
     @Test
     fun `내 정보는 리프레시 토큰이면 401을 돌려준다`() {
-        assertUnauthenticated(requestCurrentUser(requestTokenPair()["refreshToken"] as String))
+        expectUnauthenticatedResponse(requestCurrentUser(requestTokenPair()["refreshToken"] as String))
     }
 
     @Test
     fun `내 정보는 사용자가 삭제됐으면 401을 돌려준다`() {
         val token = requestTokenPair()["accessToken"] as String
         jdbc.sql("DELETE FROM auth.users").update()
-        assertUnauthenticated(requestCurrentUser(token))
+        expectUnauthenticatedResponse(requestCurrentUser(token))
     }
 
     @Test
     fun `내 정보는 만료 시각이 없으면 401을 돌려준다`() {
-        assertUnauthenticated(requestCurrentUser(signAccessToken { expirationTime(null) }))
+        expectUnauthenticatedResponse(requestCurrentUser(signAccessToken { expirationTime(null) }))
     }
 
     @ParameterizedTest
     @ValueSource(strings = ["", "not-a-uuid", "1-1-1-1-1"])
     fun `내 정보는 사용자 식별자가 없거나 UUID가 아니면 401을 돌려준다`(subject: String) {
-        assertUnauthenticated(requestCurrentUser(signAccessToken { subject(subject.ifEmpty { null }) }))
+        expectUnauthenticatedResponse(requestCurrentUser(signAccessToken { subject(subject.ifEmpty { null }) }))
     }
 
     @Test
@@ -351,7 +346,7 @@ class KakaoLoginTest @Autowired constructor(private val http: RestTestClient, pr
     private fun requestCurrentUser(token: String): RestTestClient.ResponseSpec = http.get().uri("/auth/me")
         .header(HttpHeaders.AUTHORIZATION, "Bearer $token").exchange()
 
-    private fun assertUnauthenticated(response: RestTestClient.ResponseSpec) {
+    private fun expectUnauthenticatedResponse(response: RestTestClient.ResponseSpec) {
         response.expectStatus().isUnauthorized.expectBody().jsonPath("$.code").isEqualTo("UNAUTHENTICATED")
             .jsonPath("$.message").isEqualTo(ErrorCode.UNAUTHENTICATED.message).jsonPath("$.errors").isEqualTo(emptyList<Any>())
     }

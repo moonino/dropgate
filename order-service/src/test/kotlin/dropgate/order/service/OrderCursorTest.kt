@@ -1,9 +1,8 @@
 package dropgate.order.service
 
-import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
@@ -21,10 +20,9 @@ class OrderCursorTest {
     @ParameterizedTest
     @ValueSource(strings = ["", "broken!", "bm90LWEtY3Vyc29y", "MjAzMC0xMS0wMVQxMDowMDowMFosbm90LWEtdXVpZA"])
     fun `읽을 수 없는 커서는 cursor 필드의 VALIDATION_FAILED 예외로 거부한다`(encoded: String) {
-        assertThatThrownBy { OrderCursor.decode(encoded) }.isInstanceOfSatisfying(DropgateException::class.java) {
-            assertThat(it.errorCode).isEqualTo(ErrorCode.VALIDATION_FAILED)
+        assertThrowsDropgateError(ErrorCode.VALIDATION_FAILED) { OrderCursor.decode(encoded) }.satisfies({
             assertThat(it.errors.map { error -> error.field }).containsExactly("cursor")
-        }
+        })
     }
 
     @ParameterizedTest
@@ -32,10 +30,9 @@ class OrderCursorTest {
     fun `저장할 수 없는 확정 시각을 담은 커서는 cursor 필드의 VALIDATION_FAILED 예외로 거부한다`(confirmedAt: String) {
         val encoded = OrderCursor(Instant.parse(confirmedAt), UUID.randomUUID()).encode()
 
-        assertThatThrownBy { OrderCursor.decode(encoded) }.isInstanceOfSatisfying(DropgateException::class.java) {
-            assertThat(it.errorCode).isEqualTo(ErrorCode.VALIDATION_FAILED)
+        assertThrowsDropgateError(ErrorCode.VALIDATION_FAILED) { OrderCursor.decode(encoded) }.satisfies({
             assertThat(it.errors.map { error -> error.field }).containsExactly("cursor")
-        }
+        })
     }
 
     @Test

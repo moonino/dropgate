@@ -1,11 +1,9 @@
 package dropgate.common.authentication
 
-import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
-import org.assertj.core.api.AbstractThrowableAssert
+import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.time.Instant
@@ -26,18 +24,18 @@ class AccessTokenVerifierTest {
     @Test
     fun `같은 kid의 다른 키로 서명한 토큰을 거부한다`() {
         val forged = TestTokenIssuer(clock).issueAccessToken()
-        assertUnauthenticated(forged).hasMessageContaining("서명")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(forged) }.hasMessageContaining("서명")
     }
 
     @Test
     fun `JWKS에 없는 kid로 서명한 토큰을 거부한다`() {
         val unknown = TestTokenIssuer(clock, keyId = "other-key").issueAccessToken()
-        assertUnauthenticated(unknown).hasMessageContaining("other-key")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(unknown) }.hasMessageContaining("other-key")
     }
 
     @Test
     fun `JWKS에 없는 kid가 와도 JWKS를 다시 받지 않는다`() {
-        assertUnauthenticated(TestTokenIssuer(clock, keyId = "other-key").issueAccessToken())
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(TestTokenIssuer(clock, keyId = "other-key").issueAccessToken()) }
         assertThat(fetcher.fetchCount).isEqualTo(1)
     }
 
@@ -53,37 +51,31 @@ class AccessTokenVerifierTest {
     fun `만료 시각부터 토큰을 거부한다`(secondsAfterExpiry: Long) {
         val token = issuer.issueAccessToken()
         clock.advance(TestTokenIssuer.ACCESS_TOKEN_TTL.plusSeconds(secondsAfterExpiry))
-        assertUnauthenticated(token).hasMessageContaining("exp")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(token) }.hasMessageContaining("exp")
     }
 
     @Test
     fun `리프레시 토큰을 거부한다`() {
-        assertUnauthenticated(issuer.issueToken { claim("typ", "refresh") }).hasMessageContaining("리프레시")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { claim("typ", "refresh") }) }.hasMessageContaining("리프레시")
     }
 
     @Test
     fun `다른 발급자의 토큰을 거부한다`() {
-        assertUnauthenticated(issuer.issueToken { issuer("other-auth") }).hasMessageContaining("iss")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { issuer("other-auth") }) }.hasMessageContaining("iss")
     }
 
     @Test
     fun `알 수 없는 역할의 토큰을 거부한다`() {
-        assertUnauthenticated(issuer.issueToken { claim("role", "ROOT") }).hasMessageContaining("role")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { claim("role", "ROOT") }) }.hasMessageContaining("role")
     }
 
     @Test
     fun `표준 UUID가 아닌 sub를 거부한다`() {
-        assertUnauthenticated(issuer.issueToken { subject("1-1-1-1-1") }).hasMessageContaining("sub")
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify(issuer.issueToken { subject("1-1-1-1-1") }) }.hasMessageContaining("sub")
     }
 
     @Test
     fun `JWT 형식이 아닌 토큰을 거부한다`() {
-        assertUnauthenticated("invalid.jwt.token")
-    }
-
-    private fun assertUnauthenticated(token: String): AbstractThrowableAssert<*, *> {
-        val exception = assertThrows<DropgateException> { verifier.verify(token) }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.UNAUTHENTICATED)
-        return assertThat(exception)
+        assertThrowsDropgateError(ErrorCode.UNAUTHENTICATED) { verifier.verify("invalid.jwt.token") }
     }
 }

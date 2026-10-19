@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import dropgate.common.error.DropgateException
 import dropgate.common.error.ErrorCode
+import dropgate.common.error.assertThrowsDropgateError
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeEach
@@ -30,8 +31,7 @@ class RestClientJwkSetFetcherTest {
     @Test
     fun `JWKS 서버가 실패하면 AUTH_UNAVAILABLE로 거부한다`() {
         wiremock.stubFor(WireMock.get(JWKS_PATH).willReturn(WireMock.serverError()))
-        val exception = assertThrows<DropgateException> { fetcher.fetch() }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE)
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { fetcher.fetch() }
     }
 
     @Test
@@ -45,15 +45,13 @@ class RestClientJwkSetFetcherTest {
     fun `JWKS 응답이 읽기 제한 시간을 넘으면 AUTH_UNAVAILABLE로 거부한다`() {
         wiremock.stubFor(WireMock.get(JWKS_PATH).willReturn(WireMock.okJson("""{"keys":[]}""").withFixedDelay(SLOW_RESPONSE_MILLIS)))
         val impatient = RestClientJwkSetFetcher(createRestClient(readTimeoutMillis = READ_TIMEOUT_MILLIS), URI.create(wiremock.baseUrl() + JWKS_PATH))
-        val exception = assertThrows<DropgateException> { impatient.fetch() }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE)
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { impatient.fetch() }
     }
 
     @Test
     fun `JWKS 응답 본문이 비어 있으면 AUTH_UNAVAILABLE로 거부한다`() {
         wiremock.stubFor(WireMock.get(JWKS_PATH).willReturn(WireMock.noContent()))
-        val exception = assertThrows<DropgateException> { fetcher.fetch() }
-        assertThat(exception.errorCode).isEqualTo(ErrorCode.AUTH_UNAVAILABLE)
+        assertThrowsDropgateError(ErrorCode.AUTH_UNAVAILABLE) { fetcher.fetch() }
     }
 
     private fun createRestClient(readTimeoutMillis: Int): RestClient = RestClient.builder()
