@@ -76,7 +76,7 @@ class RedisOrderPersistenceTest : OrderApiIntegrationTest() {
     fun `취소의 outbox 기록이 실패하면 주문 상태와 원장도 롤백한다`() {
         val userId = UUID.randomUUID()
         val orderId = confirmations.confirm(insertDropWithStock(), userId).order.id
-        withRejectedEvents {
+        jdbc.withRejectedWrites("outbox") {
             assertThatThrownBy { cancellations.cancel(orderId, userId) }.isInstanceOf(DataAccessException::class.java)
         }
 
@@ -134,16 +134,5 @@ class RedisOrderPersistenceTest : OrderApiIntegrationTest() {
 
     private fun expectCode(code: ErrorCode, action: () -> Unit) {
         assertThatThrownBy(action).isInstanceOfSatisfying(DropgateException::class.java) { assertThat(it.errorCode).isEqualTo(code) }
-    }
-
-    private fun withRejectedEvents(action: () -> Unit) {
-        jdbc.sql("CREATE FUNCTION orders.reject_event() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''test failure''; END'").update()
-        jdbc.sql("CREATE TRIGGER reject_event BEFORE INSERT ON orders.outbox FOR EACH ROW EXECUTE FUNCTION orders.reject_event()").update()
-        try {
-            action()
-        } finally {
-            jdbc.sql("DROP TRIGGER reject_event ON orders.outbox").update()
-            jdbc.sql("DROP FUNCTION orders.reject_event()").update()
-        }
     }
 }

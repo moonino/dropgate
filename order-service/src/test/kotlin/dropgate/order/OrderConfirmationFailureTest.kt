@@ -24,7 +24,7 @@ class OrderConfirmationFailureTest : OrderApiIntegrationTest() {
     @ValueSource(strings = ["orders", "order_ledger", "outbox"])
     fun `확정 본문의 기록 실패는 롤백 완료 전용 예외다`(table: String) {
         val dropId = insertDropWithStock()
-        withRejectedWrites(table) {
+        jdbc.withRejectedWrites(table) {
             assertThatThrownBy { confirmations.confirm(dropId, UUID.randomUUID()) }
                 .isInstanceOfSatisfying(OrderConfirmationRolledBackException::class.java) { assertThat(it.errorCode).isEqualTo(ErrorCode.ORDER_PERSIST_FAILED) }
         }
@@ -34,7 +34,7 @@ class OrderConfirmationFailureTest : OrderApiIntegrationTest() {
     @Test
     fun `기존 트랜잭션 안에서도 롤백을 마친 뒤 실패가 전파된다`() {
         val dropId = insertDropWithStock()
-        withRejectedWrites("outbox") {
+        jdbc.withRejectedWrites("outbox") {
             transactions.executeWithoutResult {
                 assertThatThrownBy { confirmations.confirm(dropId, UUID.randomUUID()) }.isInstanceOf(OrderConfirmationRolledBackException::class.java)
                 assertThat(countRows("orders")).isZero()
@@ -51,16 +51,5 @@ class OrderConfirmationFailureTest : OrderApiIntegrationTest() {
         }
 
         assertThat(listOf(countRows("orders"), countRows("order_ledger"), countRows("outbox"))).containsOnly(1L)
-    }
-
-    private fun withRejectedWrites(table: String, action: () -> Unit) {
-        jdbc.sql("CREATE FUNCTION orders.reject_confirmation() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RAISE EXCEPTION ''test failure''; END'").update()
-        jdbc.sql("CREATE TRIGGER reject_confirmation BEFORE INSERT ON orders.$table FOR EACH ROW EXECUTE FUNCTION orders.reject_confirmation()").update()
-        try {
-            action()
-        } finally {
-            jdbc.sql("DROP TRIGGER reject_confirmation ON orders.$table").update()
-            jdbc.sql("DROP FUNCTION orders.reject_confirmation()").update()
-        }
     }
 }
