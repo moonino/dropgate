@@ -508,7 +508,7 @@ export interface paths {
         put?: never;
         /**
          * 구매. 대기열 확인을 켰으면 입장 상태여야 하고 1인 1개
-         * @description dropgate.order.queue.enabled가 false면 입장 확인을 건너뛴다(2주 차 기본). purchase-path=db인 DB 경로(ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다. Redis 경로는 meta OPEN과 SOLD_OUT에서 후속 검사를 이어가므로 품절 뒤 기존 구매자는 ALREADY_PURCHASED, 신규 사용자는 SOLD_OUT이다. meta 없음이나 마감 뒤에는 DROP_NOT_OPEN이다. 마지막 재고를 팔면 드롭은 SOLD_OUT이 된다.
+         * @description dropgate.order.queue.enabled가 false면 입장 확인을 건너뛴다(2주 차 기본). purchase-path=db인 DB 경로(ADR 0005)는 차감이 UNIQUE 확인보다 먼저라 이미 산 사용자도 품절 뒤에는 SOLD_OUT을 받는다. Redis 경로는 meta OPEN과 SOLD_OUT에서 후속 검사를 이어간다. 입장 확인이 꺼져 있거나 입장 검사를 통과했으면 품절 뒤 기존 구매자는 ALREADY_PURCHASED, 신규 사용자는 SOLD_OUT이다. 입장 확인이 켜져 있고 admit 키가 없으면 NOT_ADMITTED다. meta 없음이나 마감 뒤에는 DROP_NOT_OPEN이다. 마지막 재고를 팔면 드롭은 SOLD_OUT이 된다.
          */
         post: {
             parameters: {
@@ -544,7 +544,7 @@ export interface paths {
                     };
                 };
                 404: components["responses"]["NotFound"];
-                /** @description code DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED. Lua 반환 순서. DB만 경로는 DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED 순 */
+                /** @description code DROP_NOT_OPEN, ALREADY_PURCHASED, SOLD_OUT. Lua 반환 순서. DB 경로(purchase-path=db)는 DROP_NOT_OPEN, SOLD_OUT, ALREADY_PURCHASED 순 */
                 409: {
                     headers: {
                         [name: string]: unknown;
