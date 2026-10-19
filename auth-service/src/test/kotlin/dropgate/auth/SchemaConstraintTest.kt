@@ -13,7 +13,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 @SpringBootTest(classes = [AuthServiceApplication::class])
-@Import(PostgresTestcontainersConfiguration::class)
+@Import(PostgresTestcontainersConfiguration::class, RedisTestcontainersConfiguration::class)
 class SchemaConstraintTest : JwtIntegrationTest() {
     @Autowired
     lateinit var jdbc: JdbcClient
